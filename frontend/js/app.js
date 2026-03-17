@@ -1,5 +1,5 @@
 // ════ API ════
-const API = window.WO_API_URL ||(window.location.port==='5050'?window.location.origin+'/api':'http://localhost:5050/api');
+const API = window.location.origin+'/api';
 async function api(method,path,body,token){
   const h={'Content-Type':'application/json'};
   if(token)h['Authorization']='Bearer '+token;
