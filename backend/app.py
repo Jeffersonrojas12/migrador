@@ -244,8 +244,8 @@ def init_db():
                 db.execute("INSERT INTO users (email,password_hash,name,initials,phone,role) VALUES (?,?,?,?,?,?)",
                            (email, hash_password(pwd), name, initials, phone, role))
             else:
-                db.execute("UPDATE users SET name=?,initials=?,role=?,active=1 WHERE email=?",
-                           (name, initials, role, email))
+                # Solo insertar usuarios nuevos faltantes, no tocar contraseña de existentes
+                pass
         db.commit()
         print(f"[DB] Lista → {DB_PATH}")
 
