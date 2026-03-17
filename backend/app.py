@@ -1,10 +1,8 @@
 """
 World Office Migrador ETL — Backend API v3.0
-Flask + SQLite + PyJWT + Email OTP + Gunicorn-ready
+Flask + SQLite + PyJWT + Gunicorn-ready
 """
-import os, sqlite3, secrets, datetime, re, smtplib, threading, hmac
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import os, sqlite3, secrets, datetime, re, threading, hmac
 from flask import Flask, request, jsonify, g, send_from_directory
 from db import get_db, DB_PATH, BASE_DIR as _BASE_DIR
 from auth_helpers import hash_password, verify_password, require_auth, require_admin
@@ -18,10 +16,6 @@ except ImportError:
 BASE_DIR   = _BASE_DIR
 STATIC_DIR = os.path.join(BASE_DIR, '..', 'frontend')
 
-SMTP_HOST = 'smtp.gmail.com'
-SMTP_PORT = 587
-SMTP_USER = 'jeffersonrojas@worldoffice.com.co'
-SMTP_PASS = 'kixezrztdclmdovy'
 
 def _load_or_create_secret():
     key_file = os.path.join(BASE_DIR, 'secret.key')
@@ -39,7 +33,6 @@ app.register_blueprint(usuarios_bp)
 app.config.update(
     SECRET_KEY        = os.environ.get('WO_SECRET', _load_or_create_secret()),
     JWT_EXPIRES_HOURS = int(os.environ.get('JWT_HOURS', 8)),
-    OTP_EXPIRES_MIN   = int(os.environ.get('OTP_MINUTES', 5)),
 )
 
 @app.after_request
@@ -82,15 +75,7 @@ CREATE TABLE IF NOT EXISTS users (
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_login    TIMESTAMP
 );
-CREATE TABLE IF NOT EXISTS otp_codes (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    code       TEXT    NOT NULL,
-    channel    TEXT    NOT NULL DEFAULT 'email',
-    used       INTEGER NOT NULL DEFAULT 0,
-    expires_at TIMESTAMP NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+
 CREATE TABLE IF NOT EXISTS sessions (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -133,44 +118,6 @@ def make_jwt(user_id, email):
                             app.config['SECRET_KEY'], algorithm='HS256')
     return token, jti, expires
 
-def send_otp_email(dest_email, dest_name, code):
-    try:
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = f'🔐 Tu código de acceso World Office: {code}'
-        msg['From']    = f'World Office Migrador <{SMTP_USER}>'
-        msg['To']      = dest_email
-        html_body = f"""<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;background:#06090f;color:#e4eeff;border-radius:16px;overflow:hidden">
-          <div style="background:linear-gradient(135deg,#00d2ff,#0044ff);padding:28px;text-align:center">
-            <div style="font-size:32px;font-weight:900;letter-spacing:.05em">World Office</div>
-            <div style="font-size:13px;opacity:.85;margin-top:4px">Migrador ETL — Verificación de acceso</div>
-          </div>
-          <div style="padding:32px">
-            <p style="margin:0 0 8px;color:#7a9bc8;font-size:14px">Hola, <b style="color:#e4eeff">{dest_name}</b></p>
-            <p style="margin:0 0 24px;color:#7a9bc8;font-size:14px;line-height:1.6">Código válido por {app.config['OTP_EXPIRES_MIN']} minutos.</p>
-            <div style="background:#0f162b;border:2px solid rgba(0,210,255,.3);border-radius:12px;padding:24px;text-align:center;margin-bottom:24px">
-              <div style="font-size:11px;color:#7a9bc8;font-family:monospace;text-transform:uppercase;letter-spacing:.15em;margin-bottom:8px">Código de verificación</div>
-              <div style="font-size:42px;font-weight:900;letter-spacing:.3em;color:#00d2ff;font-family:monospace">{code}</div>
-            </div>
-            <p style="margin:0;color:#3d5a80;font-size:12px">No compartas este código con nadie.</p>
-          </div>
-          <div style="background:#0c1120;padding:16px;text-align:center;font-size:11px;color:#3d5a80">World Office &copy; {datetime.datetime.now().year}</div>
-        </div>"""
-        text_body = f"Hola {dest_name},\n\nTu código: {code}\nVálido por {app.config['OTP_EXPIRES_MIN']} minutos."
-        msg.attach(MIMEText(text_body, 'plain', 'utf-8'))
-        msg.attach(MIMEText(html_body, 'html', 'utf-8'))
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
-            server.starttls()
-            server.login(SMTP_USER, SMTP_PASS)
-            server.sendmail(SMTP_USER, dest_email, msg.as_string())
-        return True
-    except Exception as e:
-        print(f"[EMAIL ERROR] {e}")
-        return False
-
-# require_auth, require_admin -> imported from auth_helpers.py
-
-# ── Auth ──────────────────────────────────────────────────────────
-@app.route('/api/auth/login', methods=['POST'])
 def login():
     d = request.get_json(force=True) or {}
     email = (d.get('email') or '').strip().lower()
@@ -178,35 +125,10 @@ def login():
     if not email or not password:
         return jsonify(error='Correo y contraseña son requeridos'), 400
     db = get_db()
+    now = datetime.datetime.utcnow()
     user = db.execute("SELECT * FROM users WHERE email=? AND active=1", (email,)).fetchone()
     if not user or not verify_password(password, user['password_hash']):
         return jsonify(error='Correo o contraseña incorrectos'), 401
-    db.execute("UPDATE otp_codes SET used=1 WHERE user_id=? AND used=0", (user['id'],))
-    code    = str(secrets.randbelow(900000) + 100000)
-    expires = datetime.datetime.utcnow() + datetime.timedelta(minutes=app.config['OTP_EXPIRES_MIN'])
-    db.execute("INSERT INTO otp_codes (user_id,code,channel,expires_at) VALUES (?,?,?,?)",
-               (user['id'], code, 'email', expires))
-    db.commit()
-    sent = send_otp_email(user['email'], user['name'], code)
-    parts = user['email'].split('@')
-    masked = parts[0][0] + '*'*(len(parts[0])-1) + '@' + parts[1]
-    phone = user['phone'] or ''
-    return jsonify(ok=True, user_id=user['id'], name=user['name'], initials=user['initials'],
-                   masked_email=masked, masked_phone='***'+phone[-4:] if len(phone)>=4 else '***',
-                   email_sent=sent, expires_min=app.config['OTP_EXPIRES_MIN'])
-
-@app.route('/api/auth/otp/verify', methods=['POST'])
-def otp_verify():
-    d = request.get_json(force=True) or {}
-    user_id = d.get('user_id'); code = str(d.get('code') or '').strip()
-    if not user_id or not code: return jsonify(error='Parámetros inválidos'), 400
-    db = get_db(); now = datetime.datetime.utcnow()
-    otp = db.execute("SELECT * FROM otp_codes WHERE user_id=? AND used=0 AND expires_at>? ORDER BY created_at DESC LIMIT 1",
-                     (user_id, now)).fetchone()
-    if not otp: return jsonify(error='Código expirado. Inicia sesión nuevamente.'), 401
-    if not hmac.compare_digest(otp['code'], code): return jsonify(error='Código incorrecto.'), 401
-    db.execute("UPDATE otp_codes SET used=1 WHERE id=?", (otp['id'],))
-    user = db.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
     token, jti, expdt = make_jwt(user['id'], user['email'])
     db.execute("INSERT INTO sessions (user_id,token_jti,ip_address,expires_at) VALUES (?,?,?,?)",
                (user['id'], jti, request.remote_addr, expdt))
@@ -216,22 +138,26 @@ def otp_verify():
                    user=dict(id=user['id'],email=user['email'],name=user['name'],
                              initials=user['initials'],role=user['role']))
 
-@app.route('/api/auth/resend', methods=['POST'])
-def otp_resend():
+@app.route('/api/auth/login', methods=['POST'])
+def login():
     d = request.get_json(force=True) or {}
-    user_id = d.get('user_id')
-    if not user_id: return jsonify(error='user_id requerido'), 400
-    db = get_db()
-    user = db.execute("SELECT * FROM users WHERE id=? AND active=1", (user_id,)).fetchone()
-    if not user: return jsonify(error='Usuario no encontrado'), 404
-    db.execute("UPDATE otp_codes SET used=1 WHERE user_id=? AND used=0", (user_id,))
-    code = str(secrets.randbelow(900000) + 100000)
-    expires = datetime.datetime.utcnow() + datetime.timedelta(minutes=app.config['OTP_EXPIRES_MIN'])
-    db.execute("INSERT INTO otp_codes (user_id,code,channel,expires_at) VALUES (?,?,?,?)",
-               (user_id, code, 'email', expires))
+    email    = (d.get('email') or '').strip().lower()
+    password = d.get('password') or ''
+    if not email or not password:
+        return jsonify(error='Correo y contraseña son requeridos'), 400
+    db  = get_db()
+    now = datetime.datetime.utcnow()
+    user = db.execute("SELECT * FROM users WHERE email=? AND active=1", (email,)).fetchone()
+    if not user or not verify_password(password, user['password_hash']):
+        return jsonify(error='Correo o contraseña incorrectos'), 401
+    token, jti, expdt = make_jwt(user['id'], user['email'])
+    db.execute("INSERT INTO sessions (user_id,token_jti,ip_address,expires_at) VALUES (?,?,?,?)",
+               (user['id'], jti, request.remote_addr, expdt))
+    db.execute("UPDATE users SET last_login=? WHERE id=?", (now, user['id']))
     db.commit()
-    sent = send_otp_email(user['email'], user['name'], code)
-    return jsonify(ok=True, email_sent=sent, expires_min=app.config['OTP_EXPIRES_MIN'])
+    return jsonify(ok=True, token=token,
+                   user=dict(id=user['id'], email=user['email'], name=user['name'],
+                             initials=user['initials'], role=user['role']))
 
 @app.route('/api/auth/logout', methods=['POST'])
 @require_auth
@@ -301,12 +227,13 @@ def health():
     users = db.execute("SELECT COUNT(*) n FROM users WHERE active=1").fetchone()['n']
     migs  = db.execute("SELECT COUNT(*) n FROM migration_logs").fetchone()['n']
     return jsonify(status='ok',version='3.0.0',users=users,migrations=migs,
-                   smtp=SMTP_USER,timestamp=datetime.datetime.utcnow().isoformat())
+                   timestamp=datetime.datetime.utcnow().isoformat())
 
 def init_db():
     with app.app_context():
         db = get_db()
         db.executescript(SCHEMA)
+  # column already exists
         for email, pwd, name, initials, phone, role in [
             ('jeffersonrojas@worldoffice.com.co','2','Jefferson Rojas','JR','3102666736','admin'),
             ('fabiobarahona@worldoffice.com.co','3','Fabio Barahona','FB','','user'),
