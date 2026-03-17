@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>World Office — Migrador ETL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Syne:wght@400;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="frontend/css/app.css">
+</head>
+<body>
+<!-- ════ AUTH ════ -->
+<div id="auth-screen">
+  <div class="auth-wrap">
+    <div class="auth-brand">
+      <div class="auth-logo">WO</div>
+      <div class="auth-name"><b>World Office</b> Migrador</div>
+      <div class="auth-sub">ETL MIGRATION PLATFORM · v3.0</div>
+    </div>
+    <div class="auth-card">
+      <!-- Login -->
+      <div class="auth-step vis" id="st-login">
+        <div class="a-err" id="login-err"></div>
+        <div class="a-field">
+          <div class="a-lbl">Correo electrónico</div>
+          <input class="a-inp" id="inp-email" type="email" placeholder="correo@empresa.com" autocomplete="email">
+        </div>
+        <div class="a-field">
+          <div class="a-lbl">Contraseña</div>
+          <div class="a-inp-wrap">
+            <input class="a-inp" id="inp-pass" type="password" placeholder="••••••••" autocomplete="current-password">
+            <button class="a-eye" onclick="togglePw()" tabindex="-1">👁</button>
+          </div>
+        </div>
+        <button class="a-btn" id="login-btn" onclick="doLogin()">Ingresar →</button>
+      </div>
+      <!-- OTP -->
+      <div class="auth-step" id="st-otp">
+        <div class="a-err" id="otp-err"></div>
+        <div class="otp-info">
+          <div class="otp-icon">📨</div>
+          <div class="otp-title">Verifica tu identidad</div>
+          <div class="otp-sub">Código enviado a<br><span class="otp-email" id="otp-dest">tu correo</span><br>Válido 5 minutos.</div>
+        </div>
+        <div class="otp-row">
+          <input class="otp-inp" maxlength="1" inputmode="numeric">
+          <input class="otp-inp" maxlength="1" inputmode="numeric">
+          <input class="otp-inp" maxlength="1" inputmode="numeric">
+          <input class="otp-inp" maxlength="1" inputmode="numeric">
+          <input class="otp-inp" maxlength="1" inputmode="numeric">
+          <input class="otp-inp" maxlength="1" inputmode="numeric">
+        </div>
+        <button class="a-btn" id="otp-btn" onclick="verifyOTP()">Verificar →</button>
+        <button class="a-link" onclick="resendCode()">↩ Reenviar código</button>
+        <button class="a-link" onclick="backLogin()">← Volver</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════ APP ════ -->
+<div id="app">
+  <nav class="topbar">
+    <div class="topbar-logo">WO</div>
+    <div class="topbar-title"><b>World Office</b> Migrador</div>
+    <div class="topbar-sep"></div>
+    <div class="topbar-ping"><div class="ping-dot"></div>En línea</div>
+    <div class="topbar-user">
+      <div class="user-av" id="nav-av">JR</div>
+      <div class="user-name" id="nav-un">usuario</div>
+    </div>
+    <button class="topbar-out" onclick="doLogout()">Salir</button>
+  </nav>
+  <div class="body-wrap">
+    <!-- SIDENAV -->
+    <nav class="sidenav">
+      <div class="sn-sec">Migraciones</div>
+      <div class="sn-item on" id="sn-terceros" onclick="showPg('terceros')"><span class="ico">🏢</span><span>Terceros</span></div>
+      <div class="sn-item" id="sn-empleados" onclick="showPg('empleados')"><span class="ico">👥</span><span>Empleados</span></div>
+      <div class="sn-sep"></div>
+      <div class="sn-sec">Administración</div>
+      <div class="sn-item" id="sn-usuarios" onclick="showPg('usuarios')"><span class="ico">👤</span><span>Usuarios</span></div>
+      <div class="sn-item" id="sn-historial" onclick="showPg('historial')"><span class="ico">📋</span><span>Historial</span></div>
+      <div class="sn-item" id="sn-cuenta" onclick="showPg('cuenta')"><span class="ico">⚙️</span><span>Mi cuenta</span></div>
+    </nav>
+    <!-- MAIN -->
+    <main class="main">
+
+      <!-- ═══ TERCEROS ═══ -->
+      <div class="pg vis" id="pg-terceros">
+        <div class="ph"><h1>Migración de Terceros</h1><p>Siigo Nube → World Office Cloud · Módulo Terceros</p></div>
+        <div class="wizard">
+          <div class="wz on" id="wt1"><div class="wz-n">1</div><span>Configurar</span></div>
+          <div class="wz-line"></div>
+          <div class="wz" id="wt2"><div class="wz-n">2</div><span>Archivo</span></div>
+          <div class="wz-line"></div>
+          <div class="wz" id="wt3"><div class="wz-n">3</div><span>Pipeline</span></div>
+          <div class="wz-line"></div>
+          <div class="wz" id="wt4"><div class="wz-n">4</div><span>Resultado</span></div>
+        </div>
+        <!-- S1: Config -->
+        <div id="s1">
+          <div class="card">
+            <div class="card-h"><div class="card-ico">⚙️</div><div><div class="card-t">Configuración</div><div class="card-s">Define origen, destino y módulo</div></div></div>
+            <div class="al al-e hide" id="a1"><span>⚠</span><span id="a1m"></span></div>
+            <div class="cfg-grid">
+              <div><div class="f-lbl">Software origen *</div>
+                <select class="f-sel" id="sorig">
+                  <option value="">— Selecciona —</option>
+                  <option value="Siigo Nube">Siigo Nube</option>
+                  <option value="Siigo Escritorio">Siigo Escritorio</option>
+                </select>
+              </div>
+              <div><div class="f-lbl">Software destino *</div>
+                <select class="f-sel" id="sdest">
+                  <option value="">— Selecciona —</option>
+                  <option value="World Office Cloud">World Office Cloud</option>
+                  <option value="World Office Escritorio">World Office Escritorio</option>
+                </select>
+              </div>
+              <div><div class="f-lbl">Módulo *</div>
+                <select class="f-sel" id="smod">
+                  <option value="">— Selecciona —</option>
+                  <option value="Terceros">Terceros</option>
+                </select>
+              </div>
+            </div>
+            <div id="compat" style="display:none"><div class="compat">✓ Ruta disponible — <span id="ctxt"></span></div></div>
+            <div class="btn-row"><button class="btn btn-p" onclick="goFiles()">Continuar → Archivo</button></div>
+          </div>
+        </div>
+        <!-- S2: File -->
+        <div id="s2" style="display:none">
+          <div class="card">
+            <div class="card-h"><div class="card-ico">📁</div><div><div class="card-t">Archivo fuente</div><div class="card-s" id="fsub">Exportación desde Siigo</div></div></div>
+            <div class="al al-e hide" id="a2"><span>⚠</span><span id="a2m"></span></div>
+            <div class="al al-i" style="margin-bottom:14px">
+              <span>ℹ️</span>
+              <span>Siigo: <strong>Terceros → Búsqueda de Terceros → Exportar Excel</strong>. El sistema detecta automáticamente las columnas <strong>Cliente</strong> y <strong>Proveedor</strong>.</span>
+            </div>
+            <div class="fslots">
+              <div class="fslot" id="sl-m">
+                <input type="file" id="f-m" accept=".xlsx,.xls" onchange="onFile(this,'sl-m','nm-m','maestro')">
+                <div class="fs-badge badge-req">Obligatorio</div>
+                <div class="fs-ico">📊</div>
+                <div class="fs-name">Búsqueda de Terceros.xlsx</div>
+                <div class="fs-desc">Exportación directa de Siigo Nube</div>
+                <div class="fs-sel" id="nm-m"></div>
+              </div>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-s" onclick="setStep(1)">← Volver</button>
+              <button class="btn btn-p" onclick="startETL()">🚀 Ejecutar migración</button>
+            </div>
+          </div>
+        </div>
+        <!-- S3: Pipeline -->
+        <div id="s3" style="display:none">
+          <div class="card">
+            <div class="card-h"><div class="card-ico">⚡</div><div><div class="card-t">Pipeline ETL en ejecución</div></div></div>
+            <div class="pip-hdr"><span id="pph">Iniciando...</span><span id="ppct" style="color:var(--accent);font-weight:700">0%</span></div>
+            <div class="pbar-wrap"><div class="pbar-fill" id="pbar" style="width:0%"></div></div>
+            <div class="pip-grid">
+              <div class="pip-stages">
+                <div class="ps" id="ps0"><div class="ps-ico">📖</div><div><div class="ps-n">Configuración</div><div class="ps-d">Plantilla WO Cloud</div></div></div>
+                <div class="ps" id="ps1"><div class="ps-ico">📁</div><div><div class="ps-n">Lectura</div><div class="ps-d">Excel Siigo · 45 columnas</div></div></div>
+                <div class="ps" id="ps2"><div class="ps-ico">🔗</div><div><div class="ps-n">Consolidación</div><div class="ps-d">Dedup · Cliente/Proveedor</div></div></div>
+                <div class="ps" id="ps3"><div class="ps-ico">🔧</div><div><div class="ps-n">Transformación</div><div class="ps-d">Nombres · Tel · Dir · 30 campos</div></div></div>
+                <div class="ps" id="ps4"><div class="ps-ico">✓</div><div><div class="ps-n">Validación</div><div class="ps-d">Campos obligatorios</div></div></div>
+                <div class="ps" id="ps5"><div class="ps-ico">📤</div><div><div class="ps-n">Generación Excel</div><div class="ps-d">2 hojas · Plantilla WO</div></div></div>
+              </div>
+              <div>
+                <div class="plog-sec">▶ Log en tiempo real</div>
+                <div class="logp" id="logp"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- S4: Result -->
+        <div id="s4" style="display:none">
+          <div class="res-hero">
+            <div class="res-ico">🎉</div>
+            <div class="res-t">Migración completada</div>
+            <div class="res-s" id="rsub">Pipeline finalizado</div>
+          </div>
+          <div class="stats">
+            <div class="stat sv-b"><div class="stat-v" id="st-in">—</div><div class="stat-l">Entrada</div></div>
+            <div class="stat sv-g"><div class="stat-v" id="st-ok">—</div><div class="stat-l">Migrados</div></div>
+            <div class="stat sv-a"><div class="stat-v" id="st-w">—</div><div class="stat-l">Advertencias</div></div>
+            <div class="stat sv-x"><div class="stat-v" id="st-t">—</div><div class="stat-l">Segundos</div></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><div class="card-ico">📥</div><div><div class="card-t">Archivo listo</div><div class="card-s">Para importar en World Office Cloud</div></div></div>
+            <button class="dl-btn" onclick="doDownload()">
+              <div class="dl-ico">📊</div>
+              <div><div class="dl-fn" id="dl-fn">terceros_migrados.xlsx</div><div class="dl-meta">Excel · 2 hojas · WO Cloud</div></div>
+              <div class="dl-arr">⬇</div>
+            </button>
+            <div class="sheet-tags"><span class="stag">📋 Importación Terceros</span><span class="stag">📄 LISTAS</span></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><div class="card-ico">📋</div><div><div class="card-t">Log del pipeline</div></div></div>
+            <div class="logp" id="rlog" style="height:180px"></div>
+          </div>
+          <div class="btn-row"><button class="btn btn-s" onclick="resetAll()">+ Nueva migración</button></div>
+        </div>
+      </div>
+
+      <!-- ═══ EMPLEADOS ═══ -->
+      <div class="pg" id="pg-empleados">
+        <div class="ph"><h1>Migración de Empleados</h1><p>Siigo Cloud → World Office Cloud · Ficha Personal Empleados</p></div>
+        <div class="wizard">
+          <div class="wz on" id="ne1"><div class="wz-n">1</div><span>Información</span></div>
+          <div class="wz-line"></div>
+          <div class="wz" id="ne2"><div class="wz-n">2</div><span>Archivos</span></div>
+          <div class="wz-line"></div>
+          <div class="wz" id="ne3"><div class="wz-n">3</div><span>Pipeline</span></div>
+          <div class="wz-line"></div>
+          <div class="wz" id="ne4"><div class="wz-n">4</div><span>Resultado</span></div>
+        </div>
+        <div id="s-emp1">
+          <div class="card">
+            <div class="card-h"><div class="card-ico">👥</div><div><div class="card-t">Migración empleados</div><div class="card-s">Siigo Cloud → WO Cloud</div></div></div>
+            <div class="al al-i" style="margin-bottom:12px"><span>📋</span><div>
+              Exporta desde Siigo Cloud:<br>
+              • Nómina → Empleados → <strong>Modelo_Importacion_Empleados.xlsx</strong><br>
+              • Nómina → Contratos → <strong>Modelo_Importacion_Contratos.xlsx</strong>
+            </div></div>
+            <div class="al al-s"><span>✓</span><span>Genera: <strong>Ficha Personal Empleados</strong> (54 columnas) + LISTAS — listo para WO Cloud</span></div>
+            <div class="btn-row"><button class="btn btn-p" onclick="empGoStart()">Continuar → Archivos</button></div>
+          </div>
+        </div>
+        <div id="s-emp2" style="display:none">
+          <div class="card">
+            <div class="card-h"><div class="card-ico">📁</div><div><div class="card-t">Archivos Siigo Cloud</div></div></div>
+            <div class="al al-e hide" id="emp-a2"><span>⚠</span><span id="emp-a2m"></span></div>
+            <div class="fslots" style="grid-template-columns:1fr 1fr;max-width:560px">
+              <div class="fslot" id="sl-emp-e">
+                <input type="file" accept=".xlsx,.xls" onchange="empOnFile(this,'sl-emp-e','nm-emp-e','empleados')">
+                <div class="fs-badge badge-req">Obligatorio</div>
+                <div class="fs-ico">👥</div>
+                <div class="fs-name">Modelo_Importacion_Empleados.xlsx</div>
+                <div class="fs-desc">Datos personales y bancarios</div>
+                <div class="fs-sel" id="nm-emp-e"></div>
+              </div>
+              <div class="fslot" id="sl-emp-c">
+                <input type="file" accept=".xlsx,.xls" onchange="empOnFile(this,'sl-emp-c','nm-emp-c','contratos')">
+                <div class="fs-badge badge-opt">Recomendado</div>
+                <div class="fs-ico">📋</div>
+                <div class="fs-name">Modelo_Importacion_Contratos.xlsx</div>
+                <div class="fs-desc">Contrato, sueldo, EPS, pensión</div>
+                <div class="fs-sel" id="nm-emp-c"></div>
+              </div>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-s" onclick="empGoBack()">← Volver</button>
+              <button class="btn btn-p" onclick="startEmpETL()">🚀 Ejecutar ETL</button>
+            </div>
+          </div>
+        </div>
+        <div id="s-emp3" style="display:none">
+          <div class="card">
+            <div class="card-h"><div class="card-ico">⚡</div><div><div class="card-t">Pipeline ETL Empleados</div></div></div>
+            <div class="pip-hdr"><span id="emp-pph">Iniciando...</span><span id="emp-ppct" style="color:var(--accent);font-weight:700">0%</span></div>
+            <div class="pbar-wrap"><div class="pbar-fill" id="emp-pbar" style="width:0%"></div></div>
+            <div class="pip-grid">
+              <div class="pip-stages">
+                <div class="ps" id="eps0"><div class="ps-ico">📖</div><div><div class="ps-n">Configuración</div><div class="ps-d">54 columnas WO</div></div></div>
+                <div class="ps" id="eps1"><div class="ps-ico">📁</div><div><div class="ps-n">Lectura</div><div class="ps-d">Empleados + Contratos</div></div></div>
+                <div class="ps" id="eps2"><div class="ps-ico">🔗</div><div><div class="ps-n">Join por ID</div><div class="ps-d">Cruce de archivos</div></div></div>
+                <div class="ps" id="eps3"><div class="ps-ico">🔧</div><div><div class="ps-n">Transformación</div><div class="ps-d">54 campos Ficha Personal</div></div></div>
+                <div class="ps" id="eps4"><div class="ps-ico">✓</div><div><div class="ps-n">Validación</div><div class="ps-d">Campos obligatorios</div></div></div>
+                <div class="ps" id="eps5"><div class="ps-ico">📤</div><div><div class="ps-n">Generación Excel</div><div class="ps-d">Ficha Personal + LISTAS</div></div></div>
+              </div>
+              <div>
+                <div class="plog-sec">▶ Log</div>
+                <div class="logp" id="emp-logp"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="s-emp4" style="display:none">
+          <div class="res-hero"><div class="res-ico">🎉</div><div class="res-t">Empleados migrados</div><div class="res-s">Ficha Personal lista para WO Cloud</div></div>
+          <div class="stats">
+            <div class="stat sv-b"><div class="stat-v" id="est-in">—</div><div class="stat-l">Entrada</div></div>
+            <div class="stat sv-g"><div class="stat-v" id="est-ok">—</div><div class="stat-l">Migrados</div></div>
+            <div class="stat sv-a"><div class="stat-v" id="est-w">—</div><div class="stat-l">Advertencias</div></div>
+            <div class="stat sv-x"><div class="stat-v" id="est-t">—</div><div class="stat-l">Segundos</div></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><div class="card-ico">📥</div><div><div class="card-t">Archivo de salida</div></div></div>
+            <button class="dl-btn" onclick="empDoDownload()">
+              <div class="dl-ico">📊</div>
+              <div><div class="dl-fn" id="edl-fn">empleados_wo.xlsx</div><div class="dl-meta">Excel · Ficha Personal Empleados + LISTAS</div></div>
+              <div class="dl-arr">⬇</div>
+            </button>
+            <div class="sheet-tags"><span class="stag">👥 Ficha Personal Empleados</span><span class="stag">📄 LISTAS</span></div>
+          </div>
+          <div class="btn-row"><button class="btn btn-s" onclick="empReset()">+ Nueva migración</button></div>
+        </div>
+      </div>
+
+      <!-- ═══ USUARIOS (admin) ═══ -->
+      <div class="pg" id="pg-usuarios">
+        <div class="ph"><h1>Gestión de Usuarios</h1><p>Administra accesos al sistema</p></div>
+        <div class="card">
+          <div class="card-h">
+            <div class="card-ico">➕</div>
+            <div><div class="card-t">Nuevo usuario</div></div>
+            <button class="btn btn-s" onclick="toggleNuForm()" style="margin-left:auto;font-size:12px" id="nu-toggle-btn">+ Agregar</button>
+          </div>
+          <div id="nu-form" style="display:none">
+            <div class="al al-e hide" id="nu-err"><span>⚠</span><span id="nu-errm"></span></div>
+            <div class="fg fg-3">
+              <div class="ff"><div class="f-lbl">Nombre completo *</div><input class="f-inp" id="nu-name" placeholder="Nombre Apellido"></div>
+              <div class="ff"><div class="f-lbl">Correo *</div><input class="f-inp" id="nu-email" type="email" placeholder="correo@empresa.com"></div>
+              <div class="ff"><div class="f-lbl">Contraseña *</div><input class="f-inp" id="nu-pass" type="password" placeholder="Contraseña inicial"></div>
+            </div>
+            <div class="fg fg-2" style="margin-top:11px">
+              <div class="ff"><div class="f-lbl">Teléfono</div><input class="f-inp" id="nu-phone" placeholder="Celular"></div>
+              <div class="ff"><div class="f-lbl">Rol</div>
+                <select class="f-inp" id="nu-role"><option value="user">Usuario</option><option value="admin">Administrador</option></select>
+              </div>
+            </div>
+            <div class="btn-row"><button class="btn btn-p" onclick="createUser()">Crear usuario</button></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-h">
+            <div class="card-ico">👥</div><div><div class="card-t">Usuarios registrados</div></div>
+            <button class="btn btn-s" onclick="loadUsers()" style="margin-left:auto;font-size:11px">↻ Actualizar</button>
+          </div>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th></th><th>Nombre</th><th>Correo</th><th>Tel</th><th>Rol</th><th>Estado</th><th>Último acceso</th><th>Acciones</th></tr></thead>
+              <tbody id="users-tb"><tr><td colspan="8" style="text-align:center;color:var(--t3);padding:20px;font-family:var(--mono);font-size:10px">Cargando...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ HISTORIAL ═══ -->
+      <div class="pg" id="pg-historial">
+        <div class="ph"><h1>Historial de Migraciones</h1><p>Registro de ejecuciones ETL</p></div>
+        <div class="card">
+          <div class="card-h">
+            <div class="card-ico">📋</div><div><div class="card-t">Migraciones ejecutadas</div></div>
+            <button class="btn btn-s" onclick="loadMigs()" style="margin-left:auto;font-size:11px">↻ Actualizar</button>
+          </div>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Usuario</th><th>Módulo</th><th>Registros</th><th>Errores</th><th>Duración</th><th>Estado</th><th>Fecha</th></tr></thead>
+              <tbody id="mig-tb"><tr><td colspan="7" style="text-align:center;color:var(--t3);padding:20px;font-family:var(--mono);font-size:10px">Cargando...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ MI CUENTA ═══ -->
+      <div class="pg" id="pg-cuenta">
+        <div class="ph"><h1>Mi Cuenta</h1><p>Perfil y seguridad</p></div>
+        <div class="card">
+          <div class="card-h"><div class="card-ico">👤</div><div><div class="card-t">Información del perfil</div></div></div>
+          <div id="perfil-data" style="font-family:var(--mono);font-size:12px;line-height:2.2;color:var(--t2)">Cargando...</div>
+        </div>
+        <div class="card">
+          <div class="card-h"><div class="card-ico">🔑</div><div><div class="card-t">Cambiar contraseña</div><div class="card-s">Actualiza tu clave de acceso</div></div></div>
+          <div class="al al-e hide" id="cp-err"><span>⚠</span><span id="cp-errm"></span></div>
+          <div class="al al-s hide" id="cp-ok"><span>✓</span><span id="cp-okm"></span></div>
+          <div class="fg" style="max-width:380px">
+            <div class="ff"><div class="f-lbl">Contraseña actual</div><input class="f-inp" id="cp-cur" type="password" placeholder="Tu contraseña actual"></div>
+            <div class="ff"><div class="f-lbl">Nueva contraseña</div><input class="f-inp" id="cp-new" type="password" placeholder="Nueva contraseña"></div>
+            <div class="ff"><div class="f-lbl">Confirmar nueva</div><input class="f-inp" id="cp-con" type="password" placeholder="Repite la nueva"></div>
+          </div>
+          <div class="btn-row"><button class="btn btn-p" onclick="changePass()">Actualizar contraseña</button></div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- MODAL EDITAR USUARIO -->
+<div class="mover" id="edit-modal">
+  <div class="modal">
+    <div class="modal-h"><div class="modal-t">Editar usuario</div><button class="modal-x" onclick="closeEdit()">✕</button></div>
+    <div class="al al-e hide" id="eu-err"><span>⚠</span><span id="eu-errm"></span></div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--t3);margin-bottom:14px" id="eu-email-lbl"></div>
+    <div class="fg">
+      <div class="ff"><div class="f-lbl">Nombre completo</div><input class="f-inp" id="eu-name"></div>
+      <div class="ff"><div class="f-lbl">Teléfono</div><input class="f-inp" id="eu-phone"></div>
+    </div>
+    <div class="fg fg-2" style="margin-top:11px">
+      <div class="ff"><div class="f-lbl">Rol</div>
+        <select class="f-inp" id="eu-role"><option value="user">Usuario</option><option value="admin">Administrador</option></select>
+      </div>
+      <div class="ff"><div class="f-lbl">Estado</div>
+        <select class="f-inp" id="eu-active"><option value="1">Activo</option><option value="0">Inactivo</option></select>
+      </div>
+    </div>
+    <div class="ff" style="margin-top:11px">
+      <div class="f-lbl">Nueva contraseña (vacío = no cambiar)</div>
+      <input class="f-inp" id="eu-pass" type="password" placeholder="Solo si deseas cambiarla">
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-s" onclick="closeEdit()">Cancelar</button>
+      <button class="btn btn-p" onclick="saveEdit()">Guardar</button>
+    </div>
+  </div>
+</div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="frontend/js/app.js"></script>
+  <script src="frontend/js/usuarios/gestion_usuarios.js"></script>
+  <script src="frontend/js/terceros/terceros_siigo_nube_to_wo_cloud.js"></script>
+  <script src="frontend/js/empleados/empleados_siigo_cloud_to_wo_cloud.js"></script>
+  <script src="frontend/js/terceros/terceros_listas01_data.js" defer></script>
+</body>
+</html>
