@@ -1,5 +1,5 @@
 // ════ API ════
-const API = window.location.origin+'/api';
+const API = window.WO_API_URL || (window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1' ? window.location.origin+'/api' : window.location.origin+'/api');
 async function api(method,path,body,token){
   const h={'Content-Type':'application/json'};
   if(token)h['Authorization']='Bearer '+token;
@@ -19,7 +19,7 @@ function clearSess(){localStorage.removeItem('wo_s');AUTH={userId:null,token:nul
 function togglePw(){const i=document.getElementById('inp-pass');i.type=i.type==='password'?'text':'password'}
 function showErr(id,m){const e=document.getElementById(id);e.textContent=m;e.classList.add('vis')}
 function hideErr(id){document.getElementById(id).classList.remove('vis')}
-function authStep(id){['st-login','st-otp'].forEach(s=>{const el=document.getElementById(s);if(el)el.classList.toggle('vis',s===id)})}
+function authStep(id){const el=document.getElementById(id);if(el)el.classList.add('vis');}
 
 async function doLogin(){
   hideErr('login-err');
@@ -29,80 +29,35 @@ async function doLogin(){
   if(!email){document.getElementById('inp-email').classList.add('err');showErr('login-err','Ingresa tu correo.');return}
   if(!pass){document.getElementById('inp-pass').classList.add('err');showErr('login-err','Ingresa tu contraseña.');return}
   const btn=document.getElementById('login-btn');
-  btn.disabled=true;btn.textContent='Enviando código...';
+  btn.disabled=true;btn.textContent='Ingresando...';
   try{
     const d=await api('POST','/auth/login',{email,password:pass});
-    AUTH.userId=d.user_id;
-    document.getElementById('otp-dest').textContent=d.masked_email;
-    document.querySelectorAll('.otp-inp').forEach(i=>{i.value='';i.classList.remove('filled')});
-    hideErr('otp-err');
-    authStep('st-otp');
-    setTimeout(()=>{const f=document.querySelector('.otp-inp');if(f)f.focus()},150);
+    AUTH.token=d.token;
+    AUTH.user=d.user||null;
+    AUTH.userId=d.user?d.user.id:null;
+    saveSess();enterApp();
   }catch(e){
     ['inp-email','inp-pass'].forEach(id=>document.getElementById(id).classList.add('err'));
     showErr('login-err',e.message);
   }finally{btn.disabled=false;btn.textContent='Ingresar →'}
 }
 
-async function verifyOTP(){
-  hideErr('otp-err');
-  const inps=document.querySelectorAll('.otp-inp');
-  const code=Array.from(inps).map(i=>i.value).join('');
-  if(code.length<6){showErr('otp-err','Ingresa los 6 dígitos.');return}
-  const btn=document.getElementById('otp-btn');
-  btn.disabled=true;btn.textContent='Verificando...';
-  try{
-    const d=await api('POST','/auth/otp/verify',{user_id:AUTH.userId,code});
-    AUTH.token=d.token;AUTH.user=d.user;
-    saveSess();enterApp();
-  }catch(e){
-    inps.forEach(i=>{i.style.borderColor='var(--red)';setTimeout(()=>i.style.borderColor='',800)});
-    showErr('otp-err',e.message);
-  }finally{btn.disabled=false;btn.textContent='Verificar →'}
-}
 
-async function resendCode(){
-  try{
-    await api('POST','/auth/resend',{user_id:AUTH.userId});
-    document.querySelectorAll('.otp-inp').forEach(i=>{i.value='';i.classList.remove('filled')});
-    const lbl=document.getElementById('otp-dest');
-    const orig=lbl.textContent;
-    lbl.textContent='✓ Reenviado';lbl.style.color='var(--green)';
-    setTimeout(()=>{lbl.textContent=orig;lbl.style.color=''},3000);
-    const f=document.querySelector('.otp-inp');if(f)f.focus();
-  }catch(e){showErr('otp-err','No se pudo reenviar: '+e.message)}
-}
-function backLogin(){authStep('st-login')}
-
-// OTP keyboard logic
-document.querySelectorAll('.otp-inp').forEach((inp,i,arr)=>{
-  inp.addEventListener('input',e=>{
-    const v=e.target.value.replace(/\D/g,'');e.target.value=v.slice(-1);
-    e.target.classList.toggle('filled',!!e.target.value);
-    if(v&&i<arr.length-1)arr[i+1].focus();
-    if(Array.from(arr).every(x=>x.value))setTimeout(verifyOTP,80);
-  });
-  inp.addEventListener('keydown',e=>{if(e.key==='Backspace'&&!inp.value&&i>0)arr[i-1].focus()});
-  inp.addEventListener('paste',e=>{
-    e.preventDefault();
-    const p=(e.clipboardData||window.clipboardData).getData('text').replace(/\D/g,'').slice(0,6);
-    p.split('').forEach((ch,j)=>{if(arr[j]){arr[j].value=ch;arr[j].classList.add('filled')}});
-    if(p.length===6)setTimeout(verifyOTP,80);
-  });
-});
-document.getElementById('inp-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
-document.getElementById('inp-email').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('inp-pass').focus()});
 
 // ════ ENTER APP ════
 function enterApp(){
-  document.getElementById('auth-screen').style.display='none';
-  document.getElementById('app').classList.add('vis');
+  if(!AUTH.user||!AUTH.token){clearSess();return;}
+  const authEl=document.getElementById('auth-screen');
+  const appEl=document.getElementById('app');
+  if(authEl)authEl.classList.add('hidden');
+  if(appEl){appEl.classList.add('vis');appEl.style.display='flex';}
   const u=AUTH.user;
-  document.getElementById('nav-av').textContent=u.initials||u.name[0];
-  document.getElementById('nav-un').textContent=u.email.split('@')[0];
-  if(u.role!=='admin'){
-    document.getElementById('sn-usuarios').style.display='none';
-  }
+  const navAv=document.getElementById('nav-av');
+  const navUn=document.getElementById('nav-un');
+  if(navAv)navAv.textContent=u.initials||u.name[0];
+  if(navUn)navUn.textContent=(u.email||'').split('@')[0];
+  const snU=document.getElementById('sn-usuarios');
+  if(snU&&u.role!=='admin'){snU.style.display='none';}
   showPg('terceros');
 }
 
@@ -110,7 +65,7 @@ async function doLogout(){
   try{await api('POST','/auth/logout',{},AUTH.token)}catch(e){}
   clearSess();
   document.getElementById('app').classList.remove('vis');
-  document.getElementById('auth-screen').style.display='flex';
+  const _a=document.getElementById('auth-screen');if(_a){_a.classList.remove('hidden');_a.style.display='flex';}
   document.getElementById('inp-email').value='';
   document.getElementById('inp-pass').value='';
   authStep('st-login');resetAll();
@@ -172,7 +127,7 @@ async function changePass(){
 
 // ════ INIT ════
 window.addEventListener('DOMContentLoaded',async()=>{
-  if(loadSess()){
+  if(loadSess()&&AUTH.token){
     try{
       await api('GET','/auth/me',null,AUTH.token);
       enterApp();
