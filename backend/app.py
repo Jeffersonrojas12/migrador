@@ -62,7 +62,7 @@ def serve_plantilla(filename):
 def close_db(e=None):
     pass  # Thread-local connections stay open for reuse
 
-SCHEMA = """
+SCHEMA_SQLITE = """
 CREATE TABLE IF NOT EXISTS users (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     email         TEXT    NOT NULL UNIQUE COLLATE NOCASE,
@@ -75,7 +75,6 @@ CREATE TABLE IF NOT EXISTS users (
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_login    TIMESTAMP
 );
-
 CREATE TABLE IF NOT EXISTS sessions (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -105,6 +104,52 @@ CREATE TABLE IF NOT EXISTS app_config (
     value TEXT NOT NULL
 );
 """
+
+SCHEMA_PG = """
+CREATE TABLE IF NOT EXISTS users (
+    id            SERIAL PRIMARY KEY,
+    email         TEXT    NOT NULL UNIQUE,
+    password_hash TEXT    NOT NULL,
+    name          TEXT    NOT NULL,
+    initials      TEXT    NOT NULL DEFAULT 'US',
+    phone         TEXT,
+    role          TEXT    NOT NULL DEFAULT 'user' CHECK(role IN ('admin','user')),
+    active        INTEGER NOT NULL DEFAULT 1,
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_login    TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS sessions (
+    id         SERIAL PRIMARY KEY,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_jti  TEXT    NOT NULL UNIQUE,
+    active     INTEGER NOT NULL DEFAULT 1,
+    ip_address TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP NOT NULL
+);
+CREATE TABLE IF NOT EXISTS migration_logs (
+    id           SERIAL PRIMARY KEY,
+    user_id      INTEGER NOT NULL REFERENCES users(id),
+    filename_out TEXT,
+    orig_soft    TEXT,
+    dest_soft    TEXT,
+    module       TEXT,
+    records_in   INTEGER DEFAULT 0,
+    records_out  INTEGER DEFAULT 0,
+    errors       INTEGER DEFAULT 0,
+    warnings     INTEGER DEFAULT 0,
+    duration_sec REAL,
+    status       TEXT DEFAULT 'completed',
+    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS app_config (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+"""
+
+DATABASE_URL = os.environ.get('DATABASE_URL', '')
+SCHEMA = SCHEMA_PG if DATABASE_URL else SCHEMA_SQLITE
 
 # hash_password() -> imported from auth_helpers.py
 
@@ -229,25 +274,59 @@ def health():
     return jsonify(status='ok',version='3.0.0',users=users,migrations=migs,
                    timestamp=datetime.datetime.utcnow().isoformat())
 
+def db_q(sql):
+    """Convert ? placeholders to %s for PostgreSQL"""
+    from db import DATABASE_URL
+    return sql.replace('?','%s') if DATABASE_URL else sql
+
+def db_exec(db, sql, params=None):
+    from db import DATABASE_URL
+    if DATABASE_URL:
+        cur = db.cursor(); cur.execute(db_q(sql), params or ()); return cur
+    return db.execute(sql, params or ())
+
+def db_one(db, sql, params=None):
+    from db import DATABASE_URL
+    if DATABASE_URL:
+        cur = db.cursor(); cur.execute(db_q(sql), params or ())
+        r = cur.fetchone(); return dict(r) if r else None
+    r = db.execute(sql, params or ()).fetchone(); return dict(r) if r else None
+
+def db_all(db, sql, params=None):
+    from db import DATABASE_URL
+    if DATABASE_URL:
+        cur = db.cursor(); cur.execute(db_q(sql), params or ())
+        return [dict(r) for r in cur.fetchall()]
+    return [dict(r) for r in db.execute(sql, params or ()).fetchall()]
+
 def init_db():
     with app.app_context():
+        from db import DATABASE_URL
         db = get_db()
-        db.executescript(SCHEMA)
-  # column already exists
+        if os.environ.get('RESET_DB') == '1':
+            for tbl in ['migration_logs','sessions','users','app_config']:
+                try: db_exec(db, f"DROP TABLE IF EXISTS {tbl} CASCADE" if DATABASE_URL else f"DROP TABLE IF EXISTS {tbl}")
+                except: pass
+            db.commit()
+        for stmt in SCHEMA.strip().split(';'):
+            stmt = stmt.strip()
+            if stmt:
+                try: db_exec(db, stmt)
+                except Exception as e:
+                    if 'already exists' not in str(e).lower(): print(f"[DB] warning: {e}")
+        db.commit()
         for email, pwd, name, initials, phone, role in [
             ('jeffersonrojas@worldoffice.com.co','2','Jefferson Rojas','JR','3102666736','admin'),
             ('fabiobarahona@worldoffice.com.co','3','Fabio Barahona','FB','','user'),
             ('jorgerojas@worldoffice.com.co','3','Jorge Rojas','JO','','user'),
             ('samynaranjo@worldoffice.com.co','4','Samy Naranjo','SN','','user'),
         ]:
-            if not db.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone():
-                db.execute("INSERT INTO users (email,password_hash,name,initials,phone,role) VALUES (?,?,?,?,?,?)",
-                           (email, hash_password(pwd), name, initials, phone, role))
-            else:
-                # Solo insertar usuarios nuevos faltantes, no tocar contraseña de existentes
-                pass
+            if not db_one(db, "SELECT id FROM users WHERE email=?", (email,)):
+                db_exec(db, "INSERT INTO users (email,password_hash,name,initials,phone,role) VALUES (?,?,?,?,?,?)",
+                        (email, hash_password(pwd), name, initials, phone, role))
         db.commit()
-        print(f"[DB] Lista → {DB_PATH}")
+        print(f"[DB] Lista OK")
+
 
 if __name__ == '__main__':
     init_db()
