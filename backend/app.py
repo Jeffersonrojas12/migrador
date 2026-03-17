@@ -233,12 +233,11 @@ def init_db():
     with app.app_context():
         db = get_db()
         db.executescript(SCHEMA)
-  # column already exists
         for email, pwd, name, initials, phone, role in [
             ('jeffersonrojas@worldoffice.com.co','2','Jefferson Rojas','JR','3102666736','admin'),
             ('fabiobarahona@worldoffice.com.co','3','Fabio Barahona','FB','','user'),
             ('jorgerojas@worldoffice.com.co','3','Jorge Rojas','JO','','user'),
-            ('samynaranjo@worldoffice.com.co','4','samy Naranjo','SV','','user'),
+            ('samynaranjo@worldoffice.com.co','4','Samy Naranjo','SN','','user'),
         ]:
             if not db.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone():
                 db.execute("INSERT INTO users (email,password_hash,name,initials,phone,role) VALUES (?,?,?,?,?,?)",
