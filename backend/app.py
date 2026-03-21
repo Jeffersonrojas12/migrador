@@ -1,389 +1,421 @@
-:root{
-  --bg:#070b14;--surface:#0c1221;--card:#111827;--card2:#161f30;
-  --border:rgba(255,255,255,.06);--border2:rgba(255,255,255,.11);
-  --accent:#3b82f6;--accent2:#6366f1;--green:#10b981;--amber:#f59e0b;--red:#ef4444;
-  --t1:#f1f5f9;--t2:#8fa4bf;--t3:#3d5a7a;
-  --mono:'DM Mono',monospace;--sans:'Inter',sans-serif;--disp:'Syne',sans-serif;
-  --r:10px;--r2:7px;--shadow:0 8px 32px rgba(0,0,0,.45);
-}
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth}
-body{font-family:var(--sans);background:var(--bg);color:var(--t1);min-height:100vh;font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
-::-webkit-scrollbar{width:5px;height:5px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:99px}
-::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.18)}
-input,select,button,textarea{font-family:var(--sans)}
+"""
+World Office Migrador ETL — Backend API v3.0
+Flask + SQLite/PostgreSQL + PyJWT
+"""
+import os, sqlite3, secrets, datetime, re, threading, hmac, hashlib
+from functools import wraps
+from flask import Flask, Blueprint, request, jsonify, g, send_from_directory, current_app
 
-/* ───── AUTH ───── */
-#auth-screen.hidden{display:none!important}
-#auth-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;
-  background:radial-gradient(ellipse 90% 55% at 50% -5%,rgba(59,130,246,.14) 0%,transparent 70%),
-  radial-gradient(ellipse 50% 40% at 85% 90%,rgba(99,102,241,.09) 0%,transparent 60%),var(--bg)}
-.auth-wrap{width:100%;max-width:420px}
-.auth-brand{text-align:center;margin-bottom:32px}
-.auth-logo{width:52px;height:52px;background:linear-gradient(135deg,var(--accent),var(--accent2));
-  border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;
-  font-family:var(--disp);font-weight:800;font-size:22px;color:#fff;
-  box-shadow:0 0 0 1px rgba(255,255,255,.1),0 8px 28px rgba(59,130,246,.4)}
-.auth-name{font-family:var(--disp);font-size:22px;font-weight:700;letter-spacing:-.02em}
-.auth-name b{color:var(--accent)}
-.auth-sub{font-family:var(--mono);font-size:11px;color:var(--t3);margin-top:5px;letter-spacing:.06em}
-.auth-card{background:var(--card);border:1px solid var(--border2);border-radius:16px;padding:32px;
-  box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,.04)}
-.auth-step{display:none}.auth-step.vis{display:block}
-.a-lbl{font-size:10.5px;font-weight:600;color:var(--t2);letter-spacing:.07em;text-transform:uppercase;font-family:var(--mono);margin-bottom:6px}
-.a-field{margin-bottom:15px}
-.a-inp{width:100%;background:var(--surface);border:1px solid var(--border2);border-radius:var(--r2);
-  padding:11px 14px;color:var(--t1);font-size:14px;outline:none;transition:border-color .2s,box-shadow .2s}
-.a-inp:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(59,130,246,.14)}
-.a-inp.err{border-color:var(--red);box-shadow:0 0 0 3px rgba(239,68,68,.12)}
-.a-inp-wrap{position:relative}
-.a-eye{position:absolute;right:12px;top:50%;transform:translateY(-50%);
-  background:none;border:none;color:var(--t3);cursor:pointer;padding:4px;font-size:16px;transition:color .15s}
-.a-eye:hover{color:var(--t2)}
-.a-btn{width:100%;padding:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));
-  border:none;border-radius:var(--r2);color:#fff;font-size:14px;font-weight:600;cursor:pointer;
-  transition:opacity .2s,transform .1s;margin-top:8px;letter-spacing:.01em}
-.a-btn:hover:not(:disabled){opacity:.88}
-.a-btn:active:not(:disabled){transform:scale(.99)}
-.a-btn:disabled{opacity:.45;cursor:not-allowed}
-.a-link{display:block;text-align:center;width:100%;background:none;border:none;
-  color:var(--t3);font-size:12px;font-family:var(--mono);cursor:pointer;padding:8px;margin-top:5px;transition:color .2s}
-.a-link:hover{color:var(--t2)}
-.a-err{background:rgba(239,68,68,.09);border:1px solid rgba(239,68,68,.25);border-radius:var(--r2);
-  padding:10px 13px;font-size:12px;color:#fca5a5;margin-bottom:14px;display:none}
-.a-err.vis{display:block}
-.otp-info{text-align:center;margin-bottom:20px;padding:16px;
-  background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.14);border-radius:var(--r2)}
-.otp-icon{font-size:26px;margin-bottom:8px}
-.otp-title{font-weight:600;font-size:14px;margin-bottom:4px}
-.otp-sub{font-size:12px;color:var(--t2);line-height:1.6}
-.otp-email{color:var(--accent);font-weight:600}
-.otp-row{display:flex;gap:8px;justify-content:center;margin-bottom:20px}
-.otp-inp{width:46px;height:54px;text-align:center;background:var(--surface);
-  border:1.5px solid var(--border2);border-radius:var(--r2);color:var(--t1);
-  font-size:24px;font-family:var(--mono);font-weight:700;outline:none;
-  transition:border-color .2s,box-shadow .2s}
-.otp-inp:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(59,130,246,.14)}
-.otp-inp.filled{border-color:rgba(59,130,246,.5)}
+try:
+    import jwt as pyjwt
+except ImportError:
+    import PyJWT as pyjwt
 
+# ── Database ─────────────────────────────────────────────────────
+BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
+DATABASE_URL = os.environ.get('DATABASE_URL', '')
 
-/* ───── AUTH NEW DESIGN ───── */
-#auth-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0}
-#auth-screen{position:relative;min-height:100vh;display:flex;overflow:hidden;
-  background:linear-gradient(135deg,#1a1060 0%,#2d1b8e 30%,#4a2db8 60%,#6040d0 100%)}
-#auth-screen.hidden{display:none!important}
+if DATABASE_URL:
+    DB_PATH = DATABASE_URL.split('@')[-1]
+else:
+    DATA_DIR = os.environ.get('RAILWAY_VOLUME_MOUNT_PATH', BASE_DIR)
+    DB_PATH  = os.path.join(DATA_DIR, 'wo_migrador.db')
 
-.auth-layout{display:flex;width:100%;min-height:100vh;position:relative;z-index:1}
+_db_local = threading.local()
 
-/* Left panel */
-.auth-left{flex:1;display:flex;align-items:center;justify-content:center;padding:60px;
-  animation:fadeInLeft .8s ease}
-.auth-left-content{max-width:480px}
-.auth-tagline{font-family:var(--disp);font-size:clamp(32px,4vw,56px);font-weight:800;
-  color:#fff;line-height:1.1;letter-spacing:-.02em;margin-bottom:16px;
-  text-shadow:0 2px 20px rgba(0,0,0,.3)}
-.auth-tagline-sub{font-family:var(--mono);font-size:13px;color:rgba(255,255,255,.55);
-  letter-spacing:.1em;text-transform:uppercase}
+class PGWrapper:
+    def __init__(self, conn):
+        self._conn = conn
+    def execute(self, sql, params=None):
+        sql = sql.replace('?', '%s')
+        cur = self._conn.cursor()
+        cur.execute(sql, params or ())
+        return cur
+    def executescript(self, script):
+        cur = self._conn.cursor()
+        for stmt in script.strip().split(';'):
+            stmt = stmt.strip()
+            if stmt:
+                try: cur.execute(stmt)
+                except Exception as e:
+                    if 'already exists' not in str(e).lower():
+                        print(f"[DB] warning: {e}")
+                    self._conn.rollback()
+        return cur
+    def commit(self): self._conn.commit()
+    def rollback(self): self._conn.rollback()
+    @property
+    def closed(self): return self._conn.closed
 
-/* Right panel */
-.auth-right{width:420px;min-height:100vh;display:flex;align-items:center;justify-content:center;
-  padding:40px 32px;background:rgba(255,255,255,.06);
-  border-left:1px solid rgba(255,255,255,.1);backdrop-filter:blur(20px);
-  animation:fadeInRight .8s ease}
+def get_db():
+    if DATABASE_URL:
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        if not hasattr(_db_local, 'conn') or _db_local.conn is None or _db_local.conn.closed:
+            conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+            conn.autocommit = False
+            _db_local.conn = PGWrapper(conn)
+        return _db_local.conn
+    else:
+        if not hasattr(_db_local, 'conn') or _db_local.conn is None:
+            conn = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES, check_same_thread=False)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA foreign_keys=ON")
+            conn.execute("PRAGMA synchronous=NORMAL")
+            _db_local.conn = conn
+        return _db_local.conn
 
-/* Card */
-.auth-card-new{width:100%;max-width:340px}
-.auth-logo-new{text-align:center;margin-bottom:24px}
-.auth-logo-new img{width:120px;height:auto;filter:drop-shadow(0 4px 20px rgba(100,80,255,.5))}
-.auth-card-title{font-family:var(--disp);font-size:22px;font-weight:700;color:#fff;
-  text-align:center;margin-bottom:4px}
-.auth-card-sub{font-size:12px;color:rgba(255,255,255,.5);text-align:center;
-  font-family:var(--mono);margin-bottom:28px;letter-spacing:.04em}
+# ── Auth helpers ─────────────────────────────────────────────────
+def hash_password(p):
+    salt = secrets.token_hex(16)
+    h = hashlib.pbkdf2_hmac('sha256', p.encode(), salt.encode(), 260_000)
+    return f"{salt}:{h.hex()}"
 
-/* Form fields */
-.a-field-new{margin-bottom:16px}
-.a-lbl-new{font-size:11px;font-weight:600;color:rgba(255,255,255,.6);
-  letter-spacing:.08em;text-transform:uppercase;font-family:var(--mono);margin-bottom:7px}
-.a-inp-new{width:100%;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);
-  border-radius:10px;padding:12px 16px;color:#fff;font-size:14px;outline:none;
-  transition:all .2s;box-sizing:border-box}
-.a-inp-new::placeholder{color:rgba(255,255,255,.3)}
-.a-inp-new:focus{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.4);
-  box-shadow:0 0 0 3px rgba(255,255,255,.08)}
-.a-inp-new.err{border-color:rgba(239,68,68,.6);box-shadow:0 0 0 3px rgba(239,68,68,.12)}
-.a-inp-wrap-new{position:relative}
-.a-inp-wrap-new .a-inp-new{padding-right:44px}
-.a-eye-new{position:absolute;right:12px;top:50%;transform:translateY(-50%);
-  background:none;border:none;color:rgba(255,255,255,.4);cursor:pointer;
-  padding:4px;font-size:16px;transition:color .15s}
-.a-eye-new:hover{color:rgba(255,255,255,.8)}
+def verify_password(p, stored):
+    try:
+        salt, h = stored.split(':', 1)
+        exp = hashlib.pbkdf2_hmac('sha256', p.encode(), salt.encode(), 260_000)
+        return hmac.compare_digest(exp, bytes.fromhex(h))
+    except:
+        return False
 
-/* Button */
-.a-btn-new{width:100%;padding:13px;
-  background:linear-gradient(135deg,#5b4fcf,#7c6ef0);
-  border:1px solid rgba(255,255,255,.15);border-radius:10px;color:#fff;
-  font-size:15px;font-weight:700;cursor:pointer;
-  transition:all .2s;margin-top:8px;letter-spacing:.02em;
-  box-shadow:0 4px 20px rgba(91,79,207,.4)}
-.a-btn-new:hover:not(:disabled){background:linear-gradient(135deg,#6b5fdf,#8c7ef0);
-  box-shadow:0 6px 28px rgba(91,79,207,.6);transform:translateY(-1px)}
-.a-btn-new:active:not(:disabled){transform:translateY(0)}
-.a-btn-new:disabled{opacity:.45;cursor:not-allowed}
+def require_auth(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        header = request.headers.get('Authorization', '')
+        if not header.startswith('Bearer '): return jsonify(error='Token requerido'), 401
+        token = header[7:]
+        try:
+            payload = pyjwt.decode(token, current_app.config['SECRET_KEY'], algorithms=['HS256'])
+        except pyjwt.ExpiredSignatureError: return jsonify(error='Sesión expirada'), 401
+        except pyjwt.InvalidTokenError: return jsonify(error='Token inválido'), 401
+        db = get_db()
+        ses = db.execute("SELECT * FROM sessions WHERE token_jti=? AND active=1", (payload['jti'],)).fetchone()
+        if not ses: return jsonify(error='Sesión cerrada'), 401
+        user = db.execute("SELECT * FROM users WHERE id=? AND active=1", (payload['sub'],)).fetchone()
+        if not user: return jsonify(error='Usuario no encontrado'), 401
+        g.user = dict(user); g.token_jti = payload['jti']
+        return f(*args, **kwargs)
+    return decorated
 
-.auth-footer-txt{text-align:center;font-family:var(--mono);font-size:10px;
-  color:rgba(255,255,255,.25);margin-top:24px;letter-spacing:.06em}
+def require_admin(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        header = request.headers.get('Authorization', '')
+        if not header.startswith('Bearer '): return jsonify(error='Token requerido'), 401
+        token = header[7:]
+        try:
+            payload = pyjwt.decode(token, current_app.config['SECRET_KEY'], algorithms=['HS256'])
+        except pyjwt.ExpiredSignatureError: return jsonify(error='Sesión expirada'), 401
+        except pyjwt.InvalidTokenError: return jsonify(error='Token inválido'), 401
+        db = get_db()
+        ses = db.execute("SELECT * FROM sessions WHERE token_jti=? AND active=1", (payload['jti'],)).fetchone()
+        if not ses: return jsonify(error='Sesión cerrada'), 401
+        user = db.execute("SELECT * FROM users WHERE id=? AND active=1", (payload['sub'],)).fetchone()
+        if not user: return jsonify(error='Usuario no encontrado'), 401
+        g.user = dict(user); g.token_jti = payload['jti']
+        if g.user['role'] != 'admin': return jsonify(error='Se requiere rol administrador'), 403
+        return f(*args, **kwargs)
+    return decorated
 
-@keyframes fadeInLeft{from{opacity:0;transform:translateX(-30px)}to{opacity:1;transform:none}}
-@keyframes fadeInRight{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:none}}
+# ── Schema ───────────────────────────────────────────────────────
+SCHEMA_SQLITE = """
+CREATE TABLE IF NOT EXISTS users (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    email         TEXT    NOT NULL UNIQUE COLLATE NOCASE,
+    password_hash TEXT    NOT NULL,
+    name          TEXT    NOT NULL,
+    initials      TEXT    NOT NULL DEFAULT 'US',
+    phone         TEXT,
+    role          TEXT    NOT NULL DEFAULT 'user' CHECK(role IN ('admin','user')),
+    active        INTEGER NOT NULL DEFAULT 1,
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_login    TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS sessions (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_jti  TEXT    NOT NULL UNIQUE,
+    active     INTEGER NOT NULL DEFAULT 1,
+    ip_address TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP NOT NULL
+);
+CREATE TABLE IF NOT EXISTS migration_logs (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id      INTEGER NOT NULL REFERENCES users(id),
+    filename_out TEXT, orig_soft TEXT, dest_soft TEXT, module TEXT,
+    records_in   INTEGER DEFAULT 0, records_out INTEGER DEFAULT 0,
+    errors INTEGER DEFAULT 0, warnings INTEGER DEFAULT 0,
+    duration_sec REAL, status TEXT DEFAULT 'completed',
+    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS app_config (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+"""
 
-@media(max-width:768px){
-  .auth-left{display:none}
-  .auth-right{width:100%;background:none;border:none;backdrop-filter:none}
-}
+SCHEMA_PG = [
+    """CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY, email TEXT NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL, name TEXT NOT NULL,
+        initials TEXT NOT NULL DEFAULT 'US', phone TEXT,
+        role TEXT NOT NULL DEFAULT 'user' CHECK(role IN ('admin','user')),
+        active INTEGER NOT NULL DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, last_login TIMESTAMP)""",
+    """CREATE TABLE IF NOT EXISTS sessions (
+        id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token_jti TEXT NOT NULL UNIQUE, active INTEGER NOT NULL DEFAULT 1,
+        ip_address TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, expires_at TIMESTAMP NOT NULL)""",
+    """CREATE TABLE IF NOT EXISTS migration_logs (
+        id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id),
+        filename_out TEXT, orig_soft TEXT, dest_soft TEXT, module TEXT,
+        records_in INTEGER DEFAULT 0, records_out INTEGER DEFAULT 0,
+        errors INTEGER DEFAULT 0, warnings INTEGER DEFAULT 0,
+        duration_sec REAL, status TEXT DEFAULT 'completed',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""",
+    """CREATE TABLE IF NOT EXISTS app_config (key TEXT PRIMARY KEY, value TEXT NOT NULL)"""
+]
 
+SCHEMA = SCHEMA_PG if DATABASE_URL else SCHEMA_SQLITE
 
-/* ───── APP CANVAS BACKGROUND ───── */
-#app{position:relative;}
-#app-canvas{
-  position:fixed;
-  top:0;left:0;
-  width:100vw;
-  height:100vh;
-  pointer-events:none;
-  z-index:0;
-}
-/* Topbar and sidenav sit on top of canvas with semi-transparent bg */
-.topbar{
-  position:relative;z-index:200;
-  background:rgba(26,45,90,0.85) !important;
-  backdrop-filter:blur(4px);
-}
-.sidenav{
-  position:relative;z-index:10;
-  background:rgba(26,45,90,0.85) !important;
-  backdrop-filter:blur(4px);
-}
-/* App background to show canvas */
-#app{background:#1a2d5a;}
+# ── Secret key ───────────────────────────────────────────────────
+def _load_or_create_secret():
+    key_file = os.path.join(BASE_DIR, 'secret.key')
+    if os.path.exists(key_file):
+        with open(key_file, 'r') as f:
+            k = f.read().strip()
+            if k: return k
+    key = secrets.token_hex(32)
+    with open(key_file, 'w') as f: f.write(key)
+    return key
 
-/* ───── SHELL ───── */
-#app{display:none;flex-direction:column;min-height:100vh}
-#app.vis{display:flex}
-.topbar{height:54px;background:#1a2d5a;border-bottom:1px solid rgba(255,255,255,.08);
-  display:flex;align-items:center;padding:0 20px;gap:14px;
-  position:sticky;top:0;z-index:200;backdrop-filter:blur(16px)}
-.topbar-logo{width:40px;height:40px;background:transparent;
-  border-radius:8px;display:flex;align-items:center;justify-content:center;
-  font-family:var(--disp);font-weight:800;font-size:12px;color:#fff;flex-shrink:0}
-.topbar-title{font-family:var(--disp);font-size:15px;font-weight:700;white-space:nowrap}
-.topbar-title b{color:var(--accent)}
-.topbar-sep{flex:1}
-.topbar-ping{color:rgba(255,255,255,.7);display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;color:var(--green)}
-.ping-dot{background:#4ade80;width:6px;height:6px;border-radius:50%;background:var(--green);
-  box-shadow:0 0 6px var(--green);animation:blink 2s infinite}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
-.topbar-user{display:flex;align-items:center;gap:8px;padding:4px 12px 4px 5px;
-  background:var(--surface);border:1px solid var(--border2);border-radius:20px}
-.user-av{width:26px;height:26px;background:linear-gradient(135deg,var(--accent),var(--accent2));
-  border-radius:50%;display:flex;align-items:center;justify-content:center;
-  font-family:var(--mono);font-size:9px;font-weight:700;color:#fff}
-.user-name{font-size:12px;color:var(--t2)}
-.topbar-out{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:7px;padding:6px 14px;font-size:13px;cursor:pointer;font-weight:500;transition:all .15s}
-.topbar-out:hover{border-color:var(--red);color:var(--red)}
+# ── Flask app ────────────────────────────────────────────────────
+STATIC_DIR = os.path.join(BASE_DIR, '..', 'frontend')
 
-/* ───── SIDENAV ───── */
-.body-wrap{display:flex;flex:1;overflow:hidden}
-.sidenav{width:210px;flex-shrink:0;background:#1a2d5a;border-right:1px solid rgba(255,255,255,.08);
-  padding:14px 10px;display:flex;flex-direction:column;gap:2px;overflow-y:auto}
-.sn-sec{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;
-  letter-spacing:.13em;color:rgba(255,255,255,.45);padding:10px 8px 4px}
-.sn-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:6px;
-  cursor:pointer;transition:all .14s;color:rgba(255,255,255,.75);font-size:13px;font-weight:500;
-  border:1px solid transparent}
-.sn-item:hover{background:rgba(255,255,255,.12);color:#fff}
-.sn-item.on{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.2);color:#fff;font-weight:600}
-.sn-item .ico{font-size:14px;flex-shrink:0;width:18px;text-align:center}
-.sn-sep{height:1px;background:rgba(255,255,255,.1);margin:6px 0}
+app = Flask(__name__, static_folder=STATIC_DIR, static_url_path='')
+app.config.update(
+    SECRET_KEY        = os.environ.get('WO_SECRET', _load_or_create_secret()),
+    JWT_EXPIRES_HOURS = int(os.environ.get('JWT_HOURS', 8)),
+)
 
-/* ───── MAIN ───── */
-.main{flex:1;overflow-y:auto;padding:26px}
-.pg{display:none}.pg.vis{display:block}
-.ph{margin-bottom:22px}
-.ph h1{font-family:var(--disp);font-size:22px;font-weight:800;letter-spacing:-.03em;margin-bottom:3px}
-.ph p{font-size:12px;color:var(--t2);font-family:var(--mono)}
+@app.after_request
+def cors(resp):
+    resp.headers['Access-Control-Allow-Origin']  = '*'
+    resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    resp.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    return resp
 
-/* ───── CARDS ───── */
-.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:22px;margin-bottom:14px}
-.card-h{display:flex;align-items:center;gap:11px;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--border)}
-.card-ico{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;
-  font-size:15px;flex-shrink:0;background:rgba(59,130,246,.09);border:1px solid rgba(59,130,246,.18)}
-.card-t{font-size:14px;font-weight:600;font-family:var(--disp)}
-.card-s{font-size:10px;color:var(--t3);font-family:var(--mono);margin-top:1px}
+@app.route('/', defaults={'path': ''}, methods=['OPTIONS'])
+@app.route('/<path:path>', methods=['OPTIONS'])
+def preflight(path=''):
+    return jsonify(ok=True), 200
 
-/* ───── WIZARD ───── */
-.wizard{display:flex;align-items:center;background:var(--card);border:1px solid var(--border);
-  border-radius:var(--r);padding:14px 18px;margin-bottom:18px;overflow:hidden}
-.wz{display:flex;align-items:center;gap:7px;flex:1;color:var(--t3);font-size:12px;font-weight:500;transition:color .2s}
-.wz.on{color:var(--accent)}.wz.done{color:var(--green)}
-.wz-n{width:24px;height:24px;border:1.5px solid currentColor;border-radius:50%;
-  display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;font-weight:700;flex-shrink:0}
-.wz.on .wz-n{background:var(--accent);border-color:var(--accent);color:#fff}
-.wz.done .wz-n{background:var(--green);border-color:var(--green);color:#fff}
-.wz-line{flex:1;height:1px;background:var(--border);margin:0 6px}
+@app.route('/')
+def index():
+    return send_from_directory(STATIC_DIR, 'index.html')
 
-/* ───── CFG ───── */
-.cfg-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
-.f-lbl{font-size:10.5px;font-weight:600;color:var(--t2);font-family:var(--mono);letter-spacing:.05em;margin-bottom:5px}
-.f-sel{width:100%;padding:9px 32px 9px 11px;background:var(--surface);border:1px solid var(--border2);
-  border-radius:var(--r2);color:var(--t1);font-size:13px;outline:none;cursor:pointer;
-  transition:border-color .2s;appearance:none;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238fa4bf' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat:no-repeat;background-position:right 9px center}
-.f-sel:focus{border-color:var(--accent)}
-.f-inp{width:100%;padding:9px 11px;background:var(--surface);border:1px solid var(--border2);
-  border-radius:var(--r2);color:var(--t1);font-size:13px;outline:none;transition:border-color .2s,box-shadow .2s}
-.f-inp:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(59,130,246,.11)}
-.compat{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;margin-top:12px;
-  background:rgba(16,185,129,.07);border:1px solid rgba(16,185,129,.18);border-radius:4px;
-  font-size:11px;font-family:var(--mono);color:var(--green)}
+@app.route('/<path:path>')
+def static_files(path):
+    try: return send_from_directory(STATIC_DIR, path)
+    except: return send_from_directory(STATIC_DIR, 'index.html')
 
-/* ───── FILE SLOTS ───── */
-.fslots{display:grid;grid-template-columns:1fr;gap:10px;max-width:380px}
-.fslot{position:relative;border:1.5px dashed var(--border2);border-radius:var(--r);padding:18px 14px;
-  text-align:center;cursor:pointer;transition:all .2s;background:var(--surface)}
-.fslot:hover{border-color:var(--accent);background:rgba(59,130,246,.03)}
-.fslot.ok{border-color:var(--green);border-style:solid;background:rgba(16,185,129,.03)}
-.fslot input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
-.fs-badge{display:inline-block;padding:2px 8px;border-radius:4px;
-  font-family:var(--mono);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:7px}
-.badge-req{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.28);color:#fca5a5}
-.badge-opt{background:rgba(148,163,184,.08);border:1px solid rgba(148,163,184,.18);color:var(--t3)}
-.fs-ico{font-size:22px;margin-bottom:7px}
-.fs-name{font-size:12px;font-weight:600;margin-bottom:3px}
-.fs-desc{font-size:10px;color:var(--t3);font-family:var(--mono)}
-.fs-sel{font-size:10px;color:var(--green);font-family:var(--mono);margin-top:5px;font-weight:600}
+@app.route('/plantillas/<path:filename>')
+def serve_plantilla(filename):
+    return send_from_directory(os.path.join(STATIC_DIR,'plantillas'), filename, as_attachment=True)
 
-/* ───── PIPELINE ───── */
-.pip-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.pip-stages{display:flex;flex-direction:column;gap:5px}
-.ps{display:flex;align-items:center;gap:9px;padding:9px 11px;
-  background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);transition:all .22s}
-.ps.act{border-color:var(--accent);background:rgba(59,130,246,.06)}
-.ps.don{border-color:var(--green);background:rgba(16,185,129,.04)}
-.ps-ico{width:26px;height:26px;border-radius:5px;background:var(--card);
-  display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
-.ps.act .ps-ico{background:rgba(59,130,246,.14)}
-.ps.don .ps-ico{background:rgba(16,185,129,.1)}
-.ps-n{font-size:12px;font-weight:600}.ps-d{font-size:10px;color:var(--t3);font-family:var(--mono)}
-.pbar-wrap{background:var(--surface);border-radius:99px;height:3px;margin-bottom:12px;overflow:hidden}
-.pbar-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .35s ease}
-.pip-hdr{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--t2);margin-bottom:5px}
-.logp{background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);
-  padding:9px;height:210px;overflow-y:auto;font-family:var(--mono);font-size:10.5px;line-height:1.75}
-.le{display:flex;gap:7px}
-.lt{color:var(--t3);flex-shrink:0}.li{color:var(--t2)}.lw{color:var(--amber)}.lo{color:var(--accent);font-weight:500}.le-e{color:var(--red);font-weight:600}
-.plog-sec{font-family:var(--mono);font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.12em;margin-bottom:6px}
+# ── DB helpers ───────────────────────────────────────────────────
+def make_jwt(user_id, email):
+    jti     = secrets.token_hex(16)
+    expires = datetime.datetime.utcnow() + datetime.timedelta(hours=app.config['JWT_EXPIRES_HOURS'])
+    token   = pyjwt.encode({'sub':user_id,'email':email,'jti':jti,'exp':expires,
+                             'iat':datetime.datetime.utcnow()},
+                            app.config['SECRET_KEY'], algorithm='HS256')
+    return token, jti, expires
 
-/* ───── STATS ───── */
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
-.stat{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center}
-.stat-v{font-family:var(--disp);font-size:26px;font-weight:800;line-height:1;margin-bottom:3px}
-.stat-l{font-size:10px;color:var(--t3);font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em}
-.sv-b .stat-v{color:var(--accent)}.sv-g .stat-v{color:var(--green)}.sv-a .stat-v{color:var(--amber)}.sv-x .stat-v{color:var(--t2)}
+# ── Auth routes ──────────────────────────────────────────────────
+@app.route('/api/auth/login', methods=['POST'])
+def login():
+    d = request.get_json(force=True) or {}
+    email    = (d.get('email') or '').strip().lower()
+    password = d.get('password') or ''
+    if not email or not password:
+        return jsonify(error='Correo y contraseña son requeridos'), 400
+    db  = get_db()
+    now = datetime.datetime.utcnow()
+    user = db.execute("SELECT * FROM users WHERE email=? AND active=1", (email,)).fetchone()
+    if not user or not verify_password(password, user['password_hash']):
+        return jsonify(error='Correo o contraseña incorrectos'), 401
+    user = dict(user)
+    token, jti, expdt = make_jwt(user['id'], user['email'])
+    db.execute("INSERT INTO sessions (user_id,token_jti,ip_address,expires_at) VALUES (?,?,?,?)",
+               (user['id'], jti, request.remote_addr, expdt))
+    db.execute("UPDATE users SET last_login=? WHERE id=?", (now, user['id']))
+    db.commit()
+    return jsonify(ok=True, token=token,
+                   user=dict(id=user['id'],email=user['email'],name=user['name'],
+                             initials=user['initials'],role=user['role']))
 
-/* ───── DL BUTTON ───── */
-.dl-btn{display:flex;align-items:center;gap:12px;padding:14px 18px;
-  background:var(--surface);border:1px solid var(--border2);border-radius:var(--r);
-  cursor:pointer;transition:all .2s;width:100%;text-align:left}
-.dl-btn:hover{border-color:var(--green);background:rgba(16,185,129,.04)}
-.dl-ico{font-size:26px}.dl-fn{font-size:14px;font-weight:600}.dl-meta{font-size:10px;color:var(--t3);font-family:var(--mono);margin-top:2px}
-.dl-arr{margin-left:auto;font-size:18px;color:var(--t3)}
-.sheet-tags{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
-.stag{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:4px;
-  background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.14);
-  font-size:10px;font-family:var(--mono);color:var(--accent)}
+@app.route('/api/auth/logout', methods=['POST'])
+@require_auth
+def logout():
+    get_db().execute("UPDATE sessions SET active=0 WHERE token_jti=?", (g.token_jti,))
+    get_db().commit()
+    return jsonify(ok=True)
 
-/* ───── RESULT ───── */
-.res-hero{text-align:center;padding:28px 0}
-.res-ico{font-size:44px;margin-bottom:10px}
-.res-t{font-family:var(--disp);font-size:22px;font-weight:800;margin-bottom:5px}
-.res-s{font-size:13px;color:var(--t2)}
+@app.route('/api/auth/me', methods=['GET'])
+@require_auth
+def me():
+    u = g.user
+    return jsonify(id=u['id'],email=u['email'],name=u['name'],initials=u['initials'],
+                   role=u['role'],phone=u.get('phone',''),last_login=str(u.get('last_login','')))
 
-/* ───── BUTTONS ───── */
-.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--r2);
-  font-size:13px;font-weight:500;cursor:pointer;transition:all .14s;border:1px solid transparent}
-.btn-p{background:var(--accent);color:#fff;box-shadow:0 2px 10px rgba(59,130,246,.28)}
-.btn-p:hover{background:#2563eb}
-.btn-s{background:var(--surface);color:var(--t2);border-color:var(--border2)}
-.btn-s:hover{color:var(--t1);border-color:var(--t3)}
-.btn-d{background:rgba(239,68,68,.09);color:var(--red);border-color:rgba(239,68,68,.2)}
-.btn-d:hover{background:rgba(239,68,68,.14)}
-.btn:disabled{opacity:.4;cursor:not-allowed}
-.btn-row{display:flex;gap:9px;margin-top:18px;flex-wrap:wrap}
+@app.route('/api/auth/change-password', methods=['POST'])
+@require_auth
+def change_password():
+    d = request.get_json(force=True) or {}
+    cur = d.get('current_password',''); nw = d.get('new_password','')
+    if not cur or not nw: return jsonify(error='Contraseña actual y nueva requeridas'), 400
+    db = get_db()
+    user = db.execute("SELECT * FROM users WHERE id=?", (g.user['id'],)).fetchone()
+    if not verify_password(cur, dict(user)['password_hash']):
+        return jsonify(error='Contraseña actual incorrecta'), 401
+    db.execute("UPDATE users SET password_hash=? WHERE id=?", (hash_password(nw), g.user['id']))
+    db.commit()
+    return jsonify(ok=True)
 
-/* ───── ALERTS ───── */
-.al{padding:9px 13px;border-radius:var(--r2);font-size:12px;
-  display:flex;align-items:flex-start;gap:7px;margin-bottom:13px}
-.al.hide{display:none}
-.al-e{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.22);color:#fca5a5}
-.al-i{background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.18);color:#93c5fd}
-.al-s{background:rgba(16,185,129,.07);border:1px solid rgba(16,185,129,.18);color:#6ee7b7}
-.al-w{background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.18);color:#fcd34d}
+# ── User routes ──────────────────────────────────────────────────
+@app.route('/api/users', methods=['GET'])
+@require_admin
+def list_users():
+    rows = get_db().execute("SELECT id,email,name,initials,phone,role,active,created_at,last_login FROM users ORDER BY id").fetchall()
+    return jsonify([dict(r) for r in rows])
 
-/* ───── TABLES ───── */
-.tbl-wrap{overflow-x:auto;border-radius:var(--r);border:1px solid var(--border)}
-table{width:100%;border-collapse:collapse;font-size:12px}
-thead{background:rgba(255,255,255,.02)}
-th{padding:9px 13px;text-align:left;font-family:var(--mono);font-size:9.5px;text-transform:uppercase;
-  letter-spacing:.1em;color:var(--t3);white-space:nowrap;border-bottom:1px solid var(--border)}
-td{padding:9px 13px;border-bottom:1px solid rgba(255,255,255,.035)}
-tr:last-child td{border-bottom:none}
-tr:hover td{background:rgba(255,255,255,.015)}
-.badge{display:inline-block;padding:2px 7px;border-radius:4px;
-  font-family:var(--mono);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em}
-.b-admin{background:rgba(245,158,11,.11);border:1px solid rgba(245,158,11,.22);color:var(--amber)}
-.b-user{background:rgba(59,130,246,.09);border:1px solid rgba(59,130,246,.2);color:var(--accent)}
-.b-done{background:rgba(16,185,129,.09);border:1px solid rgba(16,185,129,.2);color:var(--green)}
-.b-err{background:rgba(239,68,68,.09);border:1px solid rgba(239,68,68,.2);color:var(--red)}
-.b-mod{background:rgba(99,102,241,.09);border:1px solid rgba(99,102,241,.2);color:#a5b4fc}
-.dot{display:inline-block;width:7px;height:7px;border-radius:50%;vertical-align:middle;margin-right:4px}
-.dot-on{background:var(--green);box-shadow:0 0 5px var(--green)}
-.dot-off{background:var(--t3)}
-.act-row{display:flex;gap:5px}
-.ib{background:none;border:1px solid var(--border2);border-radius:5px;
-  padding:4px 8px;cursor:pointer;transition:all .14s;font-size:11px;color:var(--t2)}
-.ib:hover{border-color:var(--accent);color:var(--accent)}
-.ib.del:hover{border-color:var(--red);color:var(--red)}
-.ib:disabled{opacity:.3;cursor:not-allowed}
+@app.route('/api/users', methods=['POST'])
+@require_admin
+def create_user():
+    d = request.get_json(force=True) or {}
+    email = (d.get('email') or '').strip().lower()
+    password = d.get('password') or ''
+    name  = (d.get('name') or '').strip()
+    phone = (d.get('phone') or '').strip()
+    role  = d.get('role', 'user')
+    if not email or not password or not name: return jsonify(error='Email, contraseña y nombre son requeridos'), 400
+    if not re.match(r'^[^@]+@[^@]+\.[^@]+$', email): return jsonify(error='Email inválido'), 400
+    if role not in ('admin','user'): return jsonify(error='Rol inválido'), 400
+    initials = ''.join(w[0].upper() for w in name.split()[:2])
+    db = get_db()
+    try:
+        db.execute("INSERT INTO users (email,password_hash,name,initials,phone,role) VALUES (?,?,?,?,?,?)",
+                   (email, hash_password(password), name, initials, phone, role))
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        return jsonify(error='El correo ya está registrado'), 409
+    user = db.execute("SELECT id,email,name,initials,phone,role,active,created_at FROM users WHERE email=?", (email,)).fetchone()
+    return jsonify(dict(user)), 201
 
-/* ───── FORM ───── */
-.fg{display:grid;gap:11px}
-.fg-3{grid-template-columns:1fr 1fr 1fr}
-.fg-2{grid-template-columns:1fr 1fr}
-.ff{display:flex;flex-direction:column;gap:5px}
-.fe{font-size:11px;color:var(--red);display:none}.fe.vis{display:block}
+@app.route('/api/users/<int:uid>', methods=['GET'])
+@require_auth
+def get_user(uid):
+    if g.user['role'] != 'admin' and g.user['id'] != uid: return jsonify(error='Sin permiso'), 403
+    user = get_db().execute("SELECT id,email,name,initials,phone,role,active,created_at,last_login FROM users WHERE id=?", (uid,)).fetchone()
+    if not user: return jsonify(error='Usuario no encontrado'), 404
+    return jsonify(dict(user))
 
-/* ───── MODAL ───── */
-.mover{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:2000;
-  display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(8px)}
-.mover.vis{display:flex}
-.modal{background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:26px;
-  width:100%;max-width:500px;box-shadow:0 40px 100px rgba(0,0,0,.65);animation:min .22s ease}
-@keyframes min{from{transform:scale(.95);opacity:0}to{transform:scale(1);opacity:1}}
-.modal-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
-.modal-t{font-family:var(--disp);font-size:16px;font-weight:700}
-.modal-x{background:none;border:none;color:var(--t3);cursor:pointer;font-size:18px;padding:4px}
-.modal-x:hover{color:var(--t1)}
+@app.route('/api/users/<int:uid>', methods=['PUT'])
+@require_admin
+def update_user(uid):
+    d = request.get_json(force=True) or {}
+    name = (d.get('name') or '').strip()
+    if not name: return jsonify(error='Nombre requerido'), 400
+    db = get_db()
+    db.execute("UPDATE users SET name=?,phone=?,role=?,active=? WHERE id=?",
+               (name, d.get('phone',''), d.get('role','user'), int(d.get('active',1)), uid))
+    if d.get('password'):
+        db.execute("UPDATE users SET password_hash=? WHERE id=?", (hash_password(d['password']), uid))
+    db.commit()
+    user = db.execute("SELECT id,email,name,initials,phone,role,active FROM users WHERE id=?", (uid,)).fetchone()
+    return jsonify(dict(user))
 
-/* ───── RESPONSIVE ───── */
-@media(max-width:900px){
-  .sidenav{width:52px}
-  .sn-item span:last-child{display:none}
-  .sn-sec{display:none}
-  .cfg-grid,.fg-3,.fg-2{grid-template-columns:1fr}
-  .stats{grid-template-columns:1fr 1fr}
-  .pip-grid{grid-template-columns:1fr}
-}
-@media(max-width:580px){.main{padding:14px}.topbar{padding:0 14px}}
+@app.route('/api/users/<int:uid>', methods=['DELETE'])
+@require_admin
+def deactivate_user(uid):
+    if uid == g.user['id']: return jsonify(error='No puedes desactivar tu propia cuenta'), 400
+    get_db().execute("UPDATE users SET active=0 WHERE id=?", (uid,))
+    get_db().commit()
+    return jsonify(ok=True)
+
+# ── Migration routes ─────────────────────────────────────────────
+@app.route('/api/migrations', methods=['GET'])
+@require_auth
+def list_migrations():
+    db = get_db()
+    if g.user['role'] == 'admin':
+        rows = db.execute("""SELECT ml.*,u.name user_name,u.email user_email
+                             FROM migration_logs ml JOIN users u ON ml.user_id=u.id
+                             ORDER BY ml.created_at DESC LIMIT 200""").fetchall()
+    else:
+        rows = db.execute("""SELECT ml.*,u.name user_name,u.email user_email
+                             FROM migration_logs ml JOIN users u ON ml.user_id=u.id
+                             WHERE ml.user_id=? ORDER BY ml.created_at DESC LIMIT 100""",
+                          (g.user['id'],)).fetchall()
+    return jsonify([dict(r) for r in rows])
+
+@app.route('/api/migrations', methods=['POST'])
+@require_auth
+def log_migration():
+    d = request.get_json(force=True) or {}
+    db = get_db()
+    db.execute("""INSERT INTO migration_logs
+                  (user_id,filename_out,orig_soft,dest_soft,module,records_in,records_out,errors,warnings,duration_sec,status)
+                  VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+               (g.user['id'], d.get('filename_out',''), d.get('orig_soft',''), d.get('dest_soft',''),
+                d.get('module',''), d.get('records_in',0), d.get('records_out',0),
+                d.get('errors',0), d.get('warnings',0), d.get('duration_sec',0), d.get('status','completed')))
+    db.commit()
+    return jsonify(ok=True), 201
+
+@app.route('/api/health', methods=['GET'])
+def health():
+    db = get_db()
+    users = db.execute("SELECT COUNT(*) n FROM users WHERE active=1").fetchone()
+    return jsonify(status='ok', version='3.0.0',
+                   users=dict(users)['n'] if DATABASE_URL else users['n'],
+                   timestamp=datetime.datetime.utcnow().isoformat())
+
+# ── Init DB ──────────────────────────────────────────────────────
+def init_db():
+    with app.app_context():
+        db = get_db()
+        if os.environ.get('RESET_DB') == '1':
+            for tbl in ['migration_logs','sessions','users','app_config']:
+                try: db.execute(f"DROP TABLE IF EXISTS {tbl}" + (" CASCADE" if DATABASE_URL else ""))
+                except: pass
+            db.commit()
+        stmts = SCHEMA if isinstance(SCHEMA, list) else [s.strip() for s in SCHEMA.strip().split(';') if s.strip()]
+        for stmt in stmts:
+            if stmt.strip():
+                try:
+                    db.execute(stmt)
+                    db.commit()
+                except Exception as e:
+                    db.rollback()
+                    if 'already exists' not in str(e).lower(): print(f"[DB] warning: {e}")
+        for email, pwd, name, initials, phone, role in [
+            ('jeffersonrojas@worldoffice.com.co','2','Jefferson Rojas','JR','3102666736','admin'),
+            ('fabiobarahona@worldoffice.com.co','3','Fabio Barahona','FB','','user'),
+            ('jorgerojas@worldoffice.com.co','3','Jorge Rojas','JO','','user'),
+            ('samynaranjo@worldoffice.com.co','4','Samy Naranjo','SN','','user'),
+        ]:
+            if not db.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone():
+                db.execute("INSERT INTO users (email,password_hash,name,initials,phone,role) VALUES (?,?,?,?,?,?)",
+                           (email, hash_password(pwd), name, initials, phone, role))
+        db.commit()
+        print(f"[DB] Lista OK — {DB_PATH}")
+
+init_db()
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5050))
+    print(f"[WO Migrador] http://localhost:{port}")
+    app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
