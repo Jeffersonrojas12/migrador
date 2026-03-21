@@ -68,20 +68,120 @@ input,select,button,textarea{font-family:var(--sans)}
 .otp-inp:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(59,130,246,.14)}
 .otp-inp.filled{border-color:rgba(59,130,246,.5)}
 
+
+/* ───── AUTH NEW DESIGN ───── */
+#auth-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0}
+#auth-screen{position:relative;min-height:100vh;display:flex;overflow:hidden;
+  background:linear-gradient(135deg,#1a1060 0%,#2d1b8e 30%,#4a2db8 60%,#6040d0 100%)}
+#auth-screen.hidden{display:none!important}
+
+.auth-layout{display:flex;width:100%;min-height:100vh;position:relative;z-index:1}
+
+/* Left panel */
+.auth-left{flex:1;display:flex;align-items:center;justify-content:center;padding:60px;
+  animation:fadeInLeft .8s ease}
+.auth-left-content{max-width:480px}
+.auth-tagline{font-family:var(--disp);font-size:clamp(32px,4vw,56px);font-weight:800;
+  color:#fff;line-height:1.1;letter-spacing:-.02em;margin-bottom:16px;
+  text-shadow:0 2px 20px rgba(0,0,0,.3)}
+.auth-tagline-sub{font-family:var(--mono);font-size:13px;color:rgba(255,255,255,.55);
+  letter-spacing:.1em;text-transform:uppercase}
+
+/* Right panel */
+.auth-right{width:420px;min-height:100vh;display:flex;align-items:center;justify-content:center;
+  padding:40px 32px;background:rgba(255,255,255,.06);
+  border-left:1px solid rgba(255,255,255,.1);backdrop-filter:blur(20px);
+  animation:fadeInRight .8s ease}
+
+/* Card */
+.auth-card-new{width:100%;max-width:340px}
+.auth-logo-new{text-align:center;margin-bottom:24px}
+.auth-logo-new img{width:120px;height:auto;filter:drop-shadow(0 4px 20px rgba(100,80,255,.5))}
+.auth-card-title{font-family:var(--disp);font-size:22px;font-weight:700;color:#fff;
+  text-align:center;margin-bottom:4px}
+.auth-card-sub{font-size:12px;color:rgba(255,255,255,.5);text-align:center;
+  font-family:var(--mono);margin-bottom:28px;letter-spacing:.04em}
+
+/* Form fields */
+.a-field-new{margin-bottom:16px}
+.a-lbl-new{font-size:11px;font-weight:600;color:rgba(255,255,255,.6);
+  letter-spacing:.08em;text-transform:uppercase;font-family:var(--mono);margin-bottom:7px}
+.a-inp-new{width:100%;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);
+  border-radius:10px;padding:12px 16px;color:#fff;font-size:14px;outline:none;
+  transition:all .2s;box-sizing:border-box}
+.a-inp-new::placeholder{color:rgba(255,255,255,.3)}
+.a-inp-new:focus{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.4);
+  box-shadow:0 0 0 3px rgba(255,255,255,.08)}
+.a-inp-new.err{border-color:rgba(239,68,68,.6);box-shadow:0 0 0 3px rgba(239,68,68,.12)}
+.a-inp-wrap-new{position:relative}
+.a-inp-wrap-new .a-inp-new{padding-right:44px}
+.a-eye-new{position:absolute;right:12px;top:50%;transform:translateY(-50%);
+  background:none;border:none;color:rgba(255,255,255,.4);cursor:pointer;
+  padding:4px;font-size:16px;transition:color .15s}
+.a-eye-new:hover{color:rgba(255,255,255,.8)}
+
+/* Button */
+.a-btn-new{width:100%;padding:13px;
+  background:linear-gradient(135deg,#5b4fcf,#7c6ef0);
+  border:1px solid rgba(255,255,255,.15);border-radius:10px;color:#fff;
+  font-size:15px;font-weight:700;cursor:pointer;
+  transition:all .2s;margin-top:8px;letter-spacing:.02em;
+  box-shadow:0 4px 20px rgba(91,79,207,.4)}
+.a-btn-new:hover:not(:disabled){background:linear-gradient(135deg,#6b5fdf,#8c7ef0);
+  box-shadow:0 6px 28px rgba(91,79,207,.6);transform:translateY(-1px)}
+.a-btn-new:active:not(:disabled){transform:translateY(0)}
+.a-btn-new:disabled{opacity:.45;cursor:not-allowed}
+
+.auth-footer-txt{text-align:center;font-family:var(--mono);font-size:10px;
+  color:rgba(255,255,255,.25);margin-top:24px;letter-spacing:.06em}
+
+@keyframes fadeInLeft{from{opacity:0;transform:translateX(-30px)}to{opacity:1;transform:none}}
+@keyframes fadeInRight{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:none}}
+
+@media(max-width:768px){
+  .auth-left{display:none}
+  .auth-right{width:100%;background:none;border:none;backdrop-filter:none}
+}
+
+
+/* ───── APP CANVAS BACKGROUND ───── */
+#app{position:relative;}
+#app-canvas{
+  position:fixed;
+  top:0;left:0;
+  width:100vw;
+  height:100vh;
+  pointer-events:none;
+  z-index:0;
+}
+/* Topbar and sidenav sit on top of canvas with semi-transparent bg */
+.topbar{
+  position:relative;z-index:200;
+  background:rgba(26,45,90,0.85) !important;
+  backdrop-filter:blur(4px);
+}
+.sidenav{
+  position:relative;z-index:10;
+  background:rgba(26,45,90,0.85) !important;
+  backdrop-filter:blur(4px);
+}
+/* App background to show canvas */
+#app{background:#1a2d5a;}
+
 /* ───── SHELL ───── */
 #app{display:none;flex-direction:column;min-height:100vh}
 #app.vis{display:flex}
-.topbar{height:54px;background:var(--card);border-bottom:1px solid var(--border);
+.topbar{height:54px;background:#1a2d5a;border-bottom:1px solid rgba(255,255,255,.08);
   display:flex;align-items:center;padding:0 20px;gap:14px;
   position:sticky;top:0;z-index:200;backdrop-filter:blur(16px)}
-.topbar-logo{width:30px;height:30px;background:linear-gradient(135deg,var(--accent),var(--accent2));
+.topbar-logo{width:40px;height:40px;background:transparent;
   border-radius:8px;display:flex;align-items:center;justify-content:center;
   font-family:var(--disp);font-weight:800;font-size:12px;color:#fff;flex-shrink:0}
 .topbar-title{font-family:var(--disp);font-size:15px;font-weight:700;white-space:nowrap}
 .topbar-title b{color:var(--accent)}
 .topbar-sep{flex:1}
-.topbar-ping{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;color:var(--green)}
-.ping-dot{width:6px;height:6px;border-radius:50%;background:var(--green);
+.topbar-ping{color:rgba(255,255,255,.7);display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;color:var(--green)}
+.ping-dot{background:#4ade80;width:6px;height:6px;border-radius:50%;background:var(--green);
   box-shadow:0 0 6px var(--green);animation:blink 2s infinite}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
 .topbar-user{display:flex;align-items:center;gap:8px;padding:4px 12px 4px 5px;
@@ -90,23 +190,22 @@ input,select,button,textarea{font-family:var(--sans)}
   border-radius:50%;display:flex;align-items:center;justify-content:center;
   font-family:var(--mono);font-size:9px;font-weight:700;color:#fff}
 .user-name{font-size:12px;color:var(--t2)}
-.topbar-out{background:none;border:1px solid var(--border2);border-radius:6px;
-  padding:5px 12px;color:var(--t3);font-size:12px;font-family:var(--mono);cursor:pointer;transition:all .2s}
+.topbar-out{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:7px;padding:6px 14px;font-size:13px;cursor:pointer;font-weight:500;transition:all .15s}
 .topbar-out:hover{border-color:var(--red);color:var(--red)}
 
 /* ───── SIDENAV ───── */
 .body-wrap{display:flex;flex:1;overflow:hidden}
-.sidenav{width:210px;flex-shrink:0;background:var(--card);border-right:1px solid var(--border);
+.sidenav{width:210px;flex-shrink:0;background:#1a2d5a;border-right:1px solid rgba(255,255,255,.08);
   padding:14px 10px;display:flex;flex-direction:column;gap:2px;overflow-y:auto}
 .sn-sec{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;
-  letter-spacing:.13em;color:var(--t3);padding:10px 8px 4px}
+  letter-spacing:.13em;color:rgba(255,255,255,.45);padding:10px 8px 4px}
 .sn-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:6px;
-  cursor:pointer;transition:all .14s;color:var(--t2);font-size:13px;font-weight:500;
+  cursor:pointer;transition:all .14s;color:rgba(255,255,255,.75);font-size:13px;font-weight:500;
   border:1px solid transparent}
-.sn-item:hover{background:rgba(255,255,255,.035);color:var(--t1)}
-.sn-item.on{background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.18);color:var(--accent)}
+.sn-item:hover{background:rgba(255,255,255,.12);color:#fff}
+.sn-item.on{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.2);color:#fff;font-weight:600}
 .sn-item .ico{font-size:14px;flex-shrink:0;width:18px;text-align:center}
-.sn-sep{height:1px;background:var(--border);margin:6px 0}
+.sn-sep{height:1px;background:rgba(255,255,255,.1);margin:6px 0}
 
 /* ───── MAIN ───── */
 .main{flex:1;overflow-y:auto;padding:26px}
