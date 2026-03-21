@@ -10,38 +10,45 @@
 <body>
 <!-- ════ AUTH ════ -->
 <div id="auth-screen">
-  <div class="auth-wrap">
-    <div class="auth-brand">
-      <div class="auth-logo">WO</div>
-      <div class="auth-name"><b>World Office</b> Migrador</div>
-      <div class="auth-sub">ETL MIGRATION PLATFORM · v3.0</div>
-    </div>
-    <div class="auth-card">
-      <!-- Login -->
-      <div class="auth-step vis" id="st-login">
-        <div class="a-err" id="login-err"></div>
-        <div class="a-field">
-          <div class="a-lbl">Correo electrónico</div>
-          <input class="a-inp" id="inp-email" type="email" placeholder="correo@empresa.com" autocomplete="email">
-        </div>
-        <div class="a-field">
-          <div class="a-lbl">Contraseña</div>
-          <div class="a-inp-wrap">
-            <input class="a-inp" id="inp-pass" type="password" placeholder="••••••••" autocomplete="current-password">
-            <button class="a-eye" onclick="togglePw()" tabindex="-1">👁</button>
-          </div>
-        </div>
-        <button class="a-btn" id="login-btn" onclick="doLogin()">Ingresar →</button>
+  <canvas id="auth-canvas"></canvas>
+  <div class="auth-layout">
+    <div class="auth-left">
+      <div class="auth-left-content">
+        <div class="auth-tagline">POTENCIA TU<br>MIGRACIÓN DE DATOS</div>
+        <div class="auth-tagline-sub">Plataforma ETL · World Office</div>
       </div>
+    </div>
+    <div class="auth-right">
+      <div class="auth-card-new">
+        <div class="auth-logo-new">
+          <img src="img/wo_cloud_logo.png" alt="World Office Cloud">
+        </div>
+        <div class="auth-card-title">Migrador ETL</div>
+        <div class="auth-card-sub">Inicia sesión para continuar</div>
+        <div class="a-err" id="login-err"></div>
+        <div class="a-field-new">
+          <div class="a-lbl-new">Usuario</div>
+          <input class="a-inp-new" id="inp-email" type="email" placeholder="correo@empresa.com" autocomplete="email">
+        </div>
+        <div class="a-field-new">
+          <div class="a-lbl-new">Contraseña</div>
+          <div class="a-inp-wrap-new">
+            <input class="a-inp-new" id="inp-pass" type="password" placeholder="••••••••" autocomplete="current-password">
+            <button class="a-eye-new" onclick="togglePw()" tabindex="-1">👁</button>
           </div>
+        </div>
+        <button class="a-btn-new" id="login-btn" onclick="doLogin()">Ingresar →</button>
+        <div class="auth-footer-txt">v3.0 · ETL Migration Platform</div>
+      </div>
+    </div>
   </div>
 </div>
 
 <!-- ════ APP ════ -->
 <div id="app">
+  <canvas id="app-canvas"></canvas>
   <nav class="topbar">
-    <div class="topbar-logo">WO</div>
-    <div class="topbar-title"><b>World Office</b> Migrador</div>
+    <div class="topbar-logo"><img src="img/wo_cloud_logo.png" alt="WO" style="width:48px;height:48px;object-fit:contain;"></div>
     <div class="topbar-sep"></div>
     <div class="topbar-ping"><div class="ping-dot"></div>En línea</div>
     <div class="topbar-user">
@@ -56,6 +63,9 @@
       <div class="sn-sec">Migraciones</div>
       <div class="sn-item on" id="sn-terceros" onclick="showPg('terceros')"><span class="ico">🏢</span><span>Terceros</span></div>
       <div class="sn-item" id="sn-empleados" onclick="showPg('empleados')"><span class="ico">👥</span><span>Empleados</span></div>
+      <div class="sn-item" id="sn-inventarios" onclick="showPg('inventarios')"><span class="ico">📦</span><span>Inventarios</span></div>
+      <div class="sn-item" id="sn-saldos" onclick="showPg('saldos')"><span class="ico">💰</span><span>Saldos Iniciales</span></div>
+      <div class="sn-item" id="sn-movimientos" onclick="showPg('movimientos')"><span class="ico">📊</span><span>Mov. Contables</span></div>
       <div class="sn-sep"></div>
       <div class="sn-sec">Administración</div>
       <div class="sn-item" id="sn-usuarios" onclick="showPg('usuarios')"><span class="ico">👤</span><span>Usuarios</span></div>
@@ -87,7 +97,6 @@
                 <select class="f-sel" id="sorig">
                   <option value="">— Selecciona —</option>
                   <option value="Siigo Nube">Siigo Nube</option>
-                  <option value="Siigo Escritorio">Siigo Escritorio</option>
                 </select>
               </div>
               <div><div class="f-lbl">Software destino *</div>
@@ -126,10 +135,18 @@
                 <div class="fs-desc">Exportación directa de Siigo Nube</div>
                 <div class="fs-sel" id="nm-m"></div>
               </div>
+              <div class="fslot" id="sl-emp">
+                <input type="file" id="f-emp" accept=".xlsx,.xls" onchange="onFile(this,'sl-emp','nm-emp','empleados')">
+                <div class="fs-badge" style="background:var(--surface);color:var(--t3)">Opcional</div>
+                <div class="fs-ico">👥</div>
+                <div class="fs-name">Modelo_Importacion_Empleados.xlsx</div>
+                <div class="fs-desc">Para identificar y separar empleados</div>
+                <div class="fs-sel" id="nm-emp"></div>
+              </div>
             </div>
             <div class="btn-row">
               <button class="btn btn-s" onclick="setStep(1)">← Volver</button>
-              <button class="btn btn-p" onclick="startETL()">🚀 Ejecutar migración</button>
+              <button class="btn btn-p" onclick="routeETL()">🚀 Ejecutar migración</button>
             </div>
           </div>
         </div>
@@ -169,8 +186,8 @@
             <div class="stat sv-x"><div class="stat-v" id="st-t">—</div><div class="stat-l">Segundos</div></div>
           </div>
           <div class="card">
-            <div class="card-h"><div class="card-ico">📥</div><div><div class="card-t">Archivo listo</div><div class="card-s">Para importar en World Office Cloud</div></div></div>
-            <button class="dl-btn" onclick="doDownload()">
+            <div class="card-h"><div class="card-ico">📥</div><div><div class="card-t">Archivo listo</div><div class="card-s" id="dl-dest-label">Para importar en World Office</div></div></div>
+            <button class="dl-btn" onclick="routeDownload()">
               <div class="dl-ico">📊</div>
               <div><div class="dl-fn" id="dl-fn">terceros_migrados.xlsx</div><div class="dl-meta">Excel · 2 hojas · WO Cloud</div></div>
               <div class="dl-arr">⬇</div>
@@ -185,100 +202,113 @@
         </div>
       </div>
 
+      
       <!-- ═══ EMPLEADOS ═══ -->
       <div class="pg" id="pg-empleados">
-        <div class="ph"><h1>Migración de Empleados</h1><p>Siigo Cloud → World Office Cloud · Ficha Personal Empleados</p></div>
+        <div class="ph"><h1>Migración de Empleados</h1><p>Siigo Nube → World Office · Módulo Empleados</p></div>
         <div class="wizard">
-          <div class="wz on" id="ne1"><div class="wz-n">1</div><span>Información</span></div>
+          <div class="wz on" id="emp-wt1"><div class="wz-n">1</div><span>Configurar</span></div>
           <div class="wz-line"></div>
-          <div class="wz" id="ne2"><div class="wz-n">2</div><span>Archivos</span></div>
+          <div class="wz" id="emp-wt2"><div class="wz-n">2</div><span>Archivos</span></div>
           <div class="wz-line"></div>
-          <div class="wz" id="ne3"><div class="wz-n">3</div><span>Pipeline</span></div>
+          <div class="wz" id="emp-wt3"><div class="wz-n">3</div><span>Pipeline</span></div>
           <div class="wz-line"></div>
-          <div class="wz" id="ne4"><div class="wz-n">4</div><span>Resultado</span></div>
+          <div class="wz" id="emp-wt4"><div class="wz-n">4</div><span>Resultado</span></div>
         </div>
-        <div id="s-emp1">
+
+        <!-- S1: Config -->
+        <div id="emp-s1">
           <div class="card">
-            <div class="card-h"><div class="card-ico">👥</div><div><div class="card-t">Migración empleados</div><div class="card-s">Siigo Cloud → WO Cloud</div></div></div>
-            <div class="al al-i" style="margin-bottom:12px"><span>📋</span><div>
-              Exporta desde Siigo Cloud:<br>
-              • Nómina → Empleados → <strong>Modelo_Importacion_Empleados.xlsx</strong><br>
-              • Nómina → Contratos → <strong>Modelo_Importacion_Contratos.xlsx</strong>
-            </div></div>
-            <div class="al al-s"><span>✓</span><span>Genera: <strong>Ficha Personal Empleados</strong> (54 columnas) + LISTAS — listo para WO Cloud</span></div>
-            <div class="btn-row"><button class="btn btn-p" onclick="empGoStart()">Continuar → Archivos</button></div>
+            <div class="card-h"><div class="card-ico">⚙️</div><div><div class="card-t">Configuración</div><div class="card-s">Define origen, destino y módulo</div></div></div>
+            <div style="display:flex;gap:16px;flex-wrap:nowrap;">
+              <div style="flex:1;min-width:0"><div class="f-lbl">Software origen *</div>
+                <select class="f-sel" id="emp-sorig" style="width:100%">
+                  <option value="">— Selecciona —</option>
+                  <option value="Siigo Nube">Siigo Nube</option>
+                </select></div>
+              <div style="flex:1;min-width:0"><div class="f-lbl">Software destino *</div>
+                <select class="f-sel" id="emp-sdest" style="width:100%">
+                  <option value="">— Selecciona —</option>
+                  <option value="World Office Cloud">World Office Cloud</option>
+                  <option value="World Office Escritorio">World Office Escritorio</option>
+                </select></div>
+              <div style="flex:1;min-width:0"><div class="f-lbl">Módulo *</div>
+                <select class="f-sel" id="emp-smod" style="width:100%">
+                  <option value="">— Selecciona —</option>
+                  <option value="Empleados">Empleados</option>
+                </select></div>
+            </div>
+            <div id="emp-a1" style="display:none;color:var(--red);font-size:12px;margin-top:8px"></div>
+            <div class="btn-row" style="margin-top:16px">
+              <button class="btn btn-p" onclick="empGoFiles()">Continuar → Archivos</button>
+            </div>
           </div>
         </div>
-        <div id="s-emp2" style="display:none">
+
+        <!-- S2: Archivos -->
+        <div id="emp-s2" style="display:none">
           <div class="card">
-            <div class="card-h"><div class="card-ico">📁</div><div><div class="card-t">Archivos Siigo Cloud</div></div></div>
-            <div class="al al-e hide" id="emp-a2"><span>⚠</span><span id="emp-a2m"></span></div>
-            <div class="fslots" style="grid-template-columns:1fr 1fr;max-width:560px">
-              <div class="fslot" id="sl-emp-e">
-                <input type="file" accept=".xlsx,.xls" onchange="empOnFile(this,'sl-emp-e','nm-emp-e','empleados')">
+            <div class="card-h"><div class="card-ico">📁</div><div><div class="card-t">Archivos de entrada</div><div class="card-s" id="emp-fsub">Siigo Nube → World Office</div></div></div>
+            <div class="fslots">
+              <div class="fslot" id="sl-emp-m">
+                <input type="file" id="f-emp-m" accept=".xlsx,.xls" onchange="onFile(this,'sl-emp-m','nm-emp-m','emp-maestro')">
                 <div class="fs-badge badge-req">Obligatorio</div>
                 <div class="fs-ico">👥</div>
                 <div class="fs-name">Modelo_Importacion_Empleados.xlsx</div>
-                <div class="fs-desc">Datos personales y bancarios</div>
-                <div class="fs-sel" id="nm-emp-e"></div>
+                <div class="fs-desc">Datos personales de empleados</div>
+                <div class="fs-sel" id="nm-emp-m"></div>
               </div>
               <div class="fslot" id="sl-emp-c">
-                <input type="file" accept=".xlsx,.xls" onchange="empOnFile(this,'sl-emp-c','nm-emp-c','contratos')">
-                <div class="fs-badge badge-opt">Recomendado</div>
+                <input type="file" id="f-emp-c" accept=".xlsx,.xls" onchange="onFile(this,'sl-emp-c','nm-emp-c','emp-contratos')">
+                <div class="fs-badge badge-req">Obligatorio</div>
                 <div class="fs-ico">📋</div>
                 <div class="fs-name">Modelo_Importacion_Contratos.xlsx</div>
-                <div class="fs-desc">Contrato, sueldo, EPS, pensión</div>
+                <div class="fs-desc">Contratos laborales</div>
                 <div class="fs-sel" id="nm-emp-c"></div>
               </div>
             </div>
             <div class="btn-row">
-              <button class="btn btn-s" onclick="empGoBack()">← Volver</button>
-              <button class="btn btn-p" onclick="startEmpETL()">🚀 Ejecutar ETL</button>
+              <button class="btn btn-s" onclick="empSetStep(1)">← Volver</button>
+              <button class="btn btn-p" onclick="routeEmpETL()">🚀 Ejecutar migración</button>
             </div>
           </div>
         </div>
-        <div id="s-emp3" style="display:none">
+
+        <!-- S3: Pipeline -->
+        <div id="emp-s3" style="display:none">
           <div class="card">
-            <div class="card-h"><div class="card-ico">⚡</div><div><div class="card-t">Pipeline ETL Empleados</div></div></div>
-            <div class="pip-hdr"><span id="emp-pph">Iniciando...</span><span id="emp-ppct" style="color:var(--accent);font-weight:700">0%</span></div>
-            <div class="pbar-wrap"><div class="pbar-fill" id="emp-pbar" style="width:0%"></div></div>
-            <div class="pip-grid">
-              <div class="pip-stages">
-                <div class="ps" id="eps0"><div class="ps-ico">📖</div><div><div class="ps-n">Configuración</div><div class="ps-d">54 columnas WO</div></div></div>
-                <div class="ps" id="eps1"><div class="ps-ico">📁</div><div><div class="ps-n">Lectura</div><div class="ps-d">Empleados + Contratos</div></div></div>
-                <div class="ps" id="eps2"><div class="ps-ico">🔗</div><div><div class="ps-n">Join por ID</div><div class="ps-d">Cruce de archivos</div></div></div>
-                <div class="ps" id="eps3"><div class="ps-ico">🔧</div><div><div class="ps-n">Transformación</div><div class="ps-d">54 campos Ficha Personal</div></div></div>
-                <div class="ps" id="eps4"><div class="ps-ico">✓</div><div><div class="ps-n">Validación</div><div class="ps-d">Campos obligatorios</div></div></div>
-                <div class="ps" id="eps5"><div class="ps-ico">📤</div><div><div class="ps-n">Generación Excel</div><div class="ps-d">Ficha Personal + LISTAS</div></div></div>
-              </div>
-              <div>
-                <div class="plog-sec">▶ Log</div>
-                <div class="logp" id="emp-logp"></div>
-              </div>
+            <div class="card-h"><div class="card-ico">⚡</div><div><div class="card-t">Pipeline ETL en ejecución</div><div class="card-s" id="emp-pph">Iniciando...</div></div></div>
+            <div class="pipeline">
+              <div class="ps" id="emp-ps0">📖 Lectura</div><div class="ps-arr">→</div>
+              <div class="ps" id="emp-ps1">📁 Archivos</div><div class="ps-arr">→</div>
+              <div class="ps" id="emp-ps2">🔗 Consolidación</div><div class="ps-arr">→</div>
+              <div class="ps" id="emp-ps3">🔧 Transformación</div><div class="ps-arr">→</div>
+              <div class="ps" id="emp-ps4">📤 Generación Excel</div><div class="ps-arr">→</div>
+              <div class="ps" id="emp-ps5">✅ Listo</div>
             </div>
+            <div class="pbar-wrap"><div class="pbar"><div class="pbar-inner" id="emp-pbar" style="width:0%"></div></div><span id="emp-ppct">0%</span></div>
+            <div class="log-panel" id="emp-logp"></div>
           </div>
         </div>
-        <div id="s-emp4" style="display:none">
-          <div class="res-hero"><div class="res-ico">🎉</div><div class="res-t">Empleados migrados</div><div class="res-s">Ficha Personal lista para WO Cloud</div></div>
+
+        <!-- S4: Resultado -->
+        <div id="emp-s4" style="display:none">
+          <div class="res-hero"><div class="res-ico">🎉</div><div class="res-t">Migración completada</div></div>
           <div class="stats">
-            <div class="stat sv-b"><div class="stat-v" id="est-in">—</div><div class="stat-l">Entrada</div></div>
-            <div class="stat sv-g"><div class="stat-v" id="est-ok">—</div><div class="stat-l">Migrados</div></div>
-            <div class="stat sv-a"><div class="stat-v" id="est-w">—</div><div class="stat-l">Advertencias</div></div>
-            <div class="stat sv-x"><div class="stat-v" id="est-t">—</div><div class="stat-l">Segundos</div></div>
+            <div class="stat sv-b"><div class="stat-v" id="emp-st-in">—</div><div class="stat-l">Entrada</div></div>
+            <div class="stat sv-g"><div class="stat-v" id="emp-st-ok">—</div><div class="stat-l">Migrados</div></div>
           </div>
           <div class="card">
-            <div class="card-h"><div class="card-ico">📥</div><div><div class="card-t">Archivo de salida</div></div></div>
-            <button class="dl-btn" onclick="empDoDownload()">
+            <div class="card-h"><div class="card-ico">📥</div><div><div class="card-t">Archivo listo</div><div class="card-s" id="emp-dl-dest">Para importar en World Office</div></div></div>
+            <button class="dl-btn" onclick="routeEmpDownload()">
               <div class="dl-ico">📊</div>
-              <div><div class="dl-fn" id="edl-fn">empleados_wo.xlsx</div><div class="dl-meta">Excel · Ficha Personal Empleados + LISTAS</div></div>
+              <div><div class="dl-fn" id="emp-dl-fn">empleados_migrados.xlsx</div><div class="dl-meta">Excel · Empleados</div></div>
               <div class="dl-arr">⬇</div>
             </button>
-            <div class="sheet-tags"><span class="stag">👥 Ficha Personal Empleados</span><span class="stag">📄 LISTAS</span></div>
           </div>
-          <div class="btn-row"><button class="btn btn-s" onclick="empReset()">+ Nueva migración</button></div>
+          <div class="btn-row"><button class="btn" onclick="empReset()">+ Nueva Migración</button></div>
         </div>
       </div>
-
       <!-- ═══ USUARIOS (admin) ═══ -->
       <div class="pg" id="pg-usuarios">
         <div class="ph"><h1>Gestión de Usuarios</h1><p>Administra accesos al sistema</p></div>
@@ -384,6 +414,34 @@
     <div class="btn-row">
       <button class="btn btn-s" onclick="closeEdit()">Cancelar</button>
       <button class="btn btn-p" onclick="saveEdit()">Guardar</button>
+
+      <!-- ═══ INVENTARIOS ═══ -->
+      <div class="pg" id="pg-inventarios">
+        <div class="ph"><h1>Inventarios</h1><p>Módulo en desarrollo · Próximamente disponible</p></div>
+        <div class="card" style="text-align:center;padding:60px 20px">
+          <div style="font-size:48px;margin-bottom:16px">🚧</div>
+          <div style="font-size:18px;font-weight:600;margin-bottom:8px">Módulo en desarrollo</div>
+          <div style="color:var(--t2);font-size:14px">Este módulo estará disponible próximamente.</div>
+        </div>
+      </div>
+      <!-- ═══ SALDOS ═══ -->
+      <div class="pg" id="pg-saldos">
+        <div class="ph"><h1>Saldos Iniciales</h1><p>Módulo en desarrollo · Próximamente disponible</p></div>
+        <div class="card" style="text-align:center;padding:60px 20px">
+          <div style="font-size:48px;margin-bottom:16px">🚧</div>
+          <div style="font-size:18px;font-weight:600;margin-bottom:8px">Módulo en desarrollo</div>
+          <div style="color:var(--t2);font-size:14px">Este módulo estará disponible próximamente.</div>
+        </div>
+      </div>
+      <!-- ═══ MOVIMIENTOS ═══ -->
+      <div class="pg" id="pg-movimientos">
+        <div class="ph"><h1>Movimientos Contables</h1><p>Módulo en desarrollo · Próximamente disponible</p></div>
+        <div class="card" style="text-align:center;padding:60px 20px">
+          <div style="font-size:48px;margin-bottom:16px">🚧</div>
+          <div style="font-size:18px;font-weight:600;margin-bottom:8px">Módulo en desarrollo</div>
+          <div style="color:var(--t2);font-size:14px">Este módulo estará disponible próximamente.</div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -391,7 +449,41 @@
   <script src="js/app.js?v=770932"></script>
   <script src="js/usuarios/gestion_usuarios.js?v=770932"></script>
   <script src="js/terceros/terceros_siigo_nube_to_wo_cloud.js?v=770932"></script>
+  <script src="js/empleados/empleados_siigo_nube_to_wo_cloud.js?v=770932"></script>
+  <script src="js/empleados/empleados_siigo_nube_to_wo_escritorio.js?v=770932"></script>
   <script src="js/empleados/empleados_siigo_cloud_to_wo_cloud.js?v=770932"></script>
+  <script src="js/terceros/terceros_siigo_nube_to_wo_escritorio.js?v=770932"></script>
   <script src="js/terceros/terceros_listas01_data.js?v=770932" defer></script>
+
+<!-- ════ MAPPING MODAL ════ -->
+<div id="emp-map-modal" style="display:none;position:fixed;inset:0;z-index:9000;overflow:auto">
+  <canvas id="modal-canvas" style="position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:0"></canvas>
+  <div style="position:relative;z-index:1;min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:40px 20px;
+    background:linear-gradient(135deg,#1a1060 0%,#2d1b8e 30%,#4a2db8 60%,#6040d0 100%)">
+    <div style="width:100%;max-width:860px">
+      <div style="text-align:center;margin-bottom:28px">
+        <img src="img/wo_cloud_logo.png" style="width:80px;height:auto;filter:drop-shadow(0 4px 20px rgba(100,80,255,.5))">
+        <div style="font-size:22px;font-weight:700;color:#fff;margin-top:12px">Mapeo de Entidades</div>
+        <div style="font-size:13px;color:rgba(255,255,255,.5);margin-top:4px;font-family:monospace">
+          Ingresa el nombre exacto en World Office Escritorio para cada entidad encontrada
+        </div>
+      </div>
+      <div id="emp-map-sections"></div>
+      <div style="text-align:center;margin-top:24px">
+        <div id="emp-map-err" style="color:#fca5a5;font-size:13px;margin-bottom:12px;display:none">
+          ⚠ Completa todos los campos antes de continuar
+        </div>
+        <button onclick="empMapConfirm()" style="padding:13px 48px;
+          background:linear-gradient(135deg,#5b4fcf,#7c6ef0);
+          border:1px solid rgba(255,255,255,.15);border-radius:10px;color:#fff;
+          font-size:15px;font-weight:700;cursor:pointer;
+          box-shadow:0 4px 20px rgba(91,79,207,.4)">
+          ✅ Confirmar y exportar Excel
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
