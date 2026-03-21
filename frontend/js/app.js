@@ -1,3 +1,65 @@
+
+// ── Partículas (login + app background) ──────────────────────────
+function makeParticles(canvasId, N, speed, alpha){
+  const canvas=document.getElementById(canvasId);
+  if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  let W,H,dots=[];
+
+  function resize(){
+    W=canvas.width=canvas.offsetWidth||window.innerWidth;
+    H=canvas.height=canvas.offsetHeight||window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize',resize);
+
+  for(let i=0;i<N;i++){
+    dots.push({
+      x:Math.random()*W, y:Math.random()*H,
+      r:Math.random()*2+0.5,
+      vx:(Math.random()-.5)*speed, vy:(Math.random()-.5)*speed,
+      a:Math.random()*alpha+0.2
+    });
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    for(let i=0;i<dots.length;i++){
+      for(let j=i+1;j<dots.length;j++){
+        const dx=dots[i].x-dots[j].x, dy=dots[i].y-dots[j].y;
+        const dist=Math.sqrt(dx*dx+dy*dy);
+        if(dist<120){
+          ctx.beginPath();
+          ctx.strokeStyle=`rgba(255,255,255,${.12*(1-dist/120)})`;
+          ctx.lineWidth=.5;
+          ctx.moveTo(dots[i].x,dots[i].y);
+          ctx.lineTo(dots[j].x,dots[j].y);
+          ctx.stroke();
+        }
+      }
+    }
+    dots.forEach(d=>{
+      ctx.beginPath();
+      ctx.arc(d.x,d.y,d.r,0,Math.PI*2);
+      ctx.fillStyle=`rgba(255,255,255,${d.a})`;
+      ctx.fill();
+      d.x+=d.vx; d.y+=d.vy;
+      if(d.x<0||d.x>W)d.vx*=-1;
+      if(d.y<0||d.y>H)d.vy*=-1;
+    });
+    requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+function initParticles(){
+  makeParticles('auth-canvas', 120, 0.8, 0.7);
+}
+
+function initAppParticles(){
+  makeParticles('app-canvas', 80, 0.4, 0.5);
+}
+
 // ════ API ════
 const API = window.WO_API_URL || (window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1' ? window.location.origin+'/api' : window.location.origin+'/api');
 async function api(method,path,body,token){
@@ -7,6 +69,145 @@ async function api(method,path,body,token){
   const d=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(d.error||'Error HTTP '+r.status);
   return d;
+}
+
+// ── ETL Router — despacha según software destino ─────────────────
+function routeETL(){
+  const dest = document.getElementById('sdest') ? document.getElementById('sdest').value : '';
+  if(dest === 'World Office Escritorio'){
+    // Update download label
+    const lbl=document.getElementById('dl-dest-label');
+    if(lbl)lbl.textContent='Para importar en World Office Escritorio';
+    startEscETL();
+  } else {
+    const lbl=document.getElementById('dl-dest-label');
+    if(lbl)lbl.textContent='Para importar en World Office Cloud';
+    startETL();
+  }
+}
+
+function routeDownload(){
+  const dest = document.getElementById('sdest') ? document.getElementById('sdest').value : '';
+  if(dest === 'World Office Escritorio'){
+    escDoDownload();
+  } else {
+    doDownload();
+  }
+}
+
+// ── Empleados: wizard steps ──────────────────────────────────────
+function empSetPct(pct,msg){
+  const pb=document.getElementById('emp-pbar');
+  const pp=document.getElementById('emp-ppct');
+  const ph=document.getElementById('emp-pph');
+  if(pb) pb.style.width=pct+'%';
+  if(pp) pp.textContent=pct+'%';
+  if(ph&&msg) ph.textContent=msg;
+}
+
+// ── Empleados: pasos propios ──────────────────────────────────────
+function empSetStep(n){
+  for(let i=1;i<=4;i++){
+    const wz=document.getElementById('emp-wt'+i);
+    if(wz)wz.className='wz'+(i<n?' done':i===n?' on':'');
+    const sec=document.getElementById('emp-s'+i);
+    if(sec)sec.style.display=(i===n)?'':'none';
+  }
+}
+function empSetPStep(n){
+  for(let i=0;i<=5;i++){
+    const el=document.getElementById('emp-ps'+i);
+    if(!el)continue;
+    el.classList.toggle('act',i===n);
+    el.classList.toggle('don',i<n);
+  }
+}
+function empSetPct(pct,msg){
+  const pb=document.getElementById('emp-pbar');
+  const pp=document.getElementById('emp-ppct');
+  const ph=document.getElementById('emp-pph');
+  if(pb)pb.style.width=pct+'%';
+  if(pp)pp.textContent=pct+'%';
+  if(ph&&msg)ph.textContent=msg;
+}
+function empLog(msg,lvl='i',fase=''){
+  const panel=document.getElementById('emp-logp');
+  if(!panel)return;
+  const now=new Date().toLocaleTimeString('es-CO',{hour12:false});
+  const css={i:'li',w:'lw',o:'lo',e:'le-e'}[lvl]||'li';
+  panel.innerHTML+=`<div class="le"><span class="lt">${now}</span><span class="${css}">${msg}</span></div>`;
+  panel.scrollTop=panel.scrollHeight;
+}
+
+// ── Empleados: ir a archivos ──────────────────────────────────────
+function empGoFiles(){
+  const orig=document.getElementById('emp-sorig').value;
+  const dest=document.getElementById('emp-sdest').value;
+  const mod=document.getElementById('emp-smod').value;
+  const a=document.getElementById('emp-a1');
+  if(!orig){ if(a){a.textContent='Selecciona el software de origen.';a.style.display='block';} return; }
+  if(!dest){ if(a){a.textContent='Selecciona el software de destino.';a.style.display='block';} return; }
+  if(!mod){  if(a){a.textContent='Selecciona el módulo.';a.style.display='block';} return; }
+  if(a) a.style.display='none';
+  const fsub=document.getElementById('emp-fsub');
+  if(fsub) fsub.textContent=orig+' → '+dest+' - Módulo '+mod;
+  empSetStep(2);
+}
+
+// ── Empleados: router ETL ─────────────────────────────────────────
+function routeEmpETL(){
+  const dest=document.getElementById('emp-sdest').value;
+  const lbl=document.getElementById('emp-dl-dest');
+  if(dest==='World Office Escritorio'){
+    if(lbl) lbl.textContent='Para importar en World Office Escritorio';
+    startEmpEscETL();
+  } else {
+    if(lbl) lbl.textContent='Para importar en World Office Cloud';
+    startEmpCldETL();
+  }
+}
+
+// ── Empleados: router descarga ────────────────────────────────────
+function routeEmpDownload(){
+  const dest=document.getElementById('emp-sdest').value;
+  if(dest==='World Office Escritorio') empEscDoDownload();
+  else empCldDoDownload();
+}
+
+// ── Empleados: reset ──────────────────────────────────────────────
+function empReset(){
+  // Reset files
+  if(typeof S!=='undefined'&&S.files){ 
+    delete S.files['emp-maestro']; 
+    delete S.files['emp-contratos']; 
+  }
+  // Reset WB objects
+  try{ if(typeof EMP_CLD_WB!=='undefined') window.EMP_CLD_WB=null; }catch(e){}
+  try{ if(typeof EMP_ESC_WB!=='undefined') window.EMP_ESC_WB=null; }catch(e){}
+  // Reset log arrays
+  try{ if(typeof EMP_ESC_LOG!=='undefined'&&EMP_ESC_LOG) EMP_ESC_LOG.length=0; }catch(e){}
+  try{ if(typeof EMP_ESC_EXCL!=='undefined'&&EMP_ESC_EXCL) EMP_ESC_EXCL.length=0; }catch(e){}
+  try{ if(typeof EMP_CLD_LOG!=='undefined'&&EMP_CLD_LOG) EMP_CLD_LOG.length=0; }catch(e){}
+  try{ if(typeof EMP_CLD_EXCL!=='undefined'&&EMP_CLD_EXCL) EMP_CLD_EXCL.length=0; }catch(e){}
+  // Reset log panel and progress
+  const logp=document.getElementById('emp-logp'); if(logp) logp.innerHTML='';
+  const pb=document.getElementById('emp-pbar'); if(pb) pb.style.width='0%';
+  const pp=document.getElementById('emp-ppct'); if(pp) pp.textContent='0%';
+  const ph=document.getElementById('emp-pph'); if(ph) ph.textContent='Iniciando...';
+  // Reset file slots
+  ['sl-emp-m','sl-emp-c'].forEach(id=>{const el=document.getElementById(id);if(el)el.className='fslot';});
+  ['nm-emp-m','nm-emp-c'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='';});
+  ['f-emp-m','f-emp-c'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  // Reset stats
+  ['emp-st-in','emp-st-ok'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='—';});
+  // Reset selectors
+  ['emp-sorig','emp-sdest','emp-smod'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  // Reset alert
+  const a=document.getElementById('emp-a1'); if(a) a.style.display='none';
+  // Close mapping modal if open
+  const modal=document.getElementById('emp-map-modal'); if(modal) modal.style.display='none';
+  // Go to step 1
+  empSetStep(1);
 }
 
 // ════ SESSION ════
@@ -51,6 +252,7 @@ function enterApp(){
   const appEl=document.getElementById('app');
   if(authEl)authEl.classList.add('hidden');
   if(appEl){appEl.classList.add('vis');appEl.style.display='flex';}
+  setTimeout(initAppParticles, 100);
   const u=AUTH.user;
   const navAv=document.getElementById('nav-av');
   const navUn=document.getElementById('nav-un');
@@ -82,6 +284,20 @@ function showPg(name){
   if(name==='usuarios')loadUsers();
   if(name==='historial')loadMigs();
   if(name==='cuenta')loadPerfil();
+  // Reset module state when navigating
+  if(name==='terceros'){
+    // Reset terceros to step 1
+    if(typeof S !== 'undefined') S.files={};
+    ['sl-m'].forEach(id=>{const el=document.getElementById(id);if(el)el.className='fslot';});
+    ['nm-m'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='';});
+    ['f-m'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    if(typeof setStep==='function') setStep(1);
+    ['sorig','sdest','smod'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  }
+  if(name==='empleados'){
+    // Full reset of empleados state
+    empReset();
+  }
 }
 
 // ════ MIGRATION LOG ════
@@ -127,6 +343,7 @@ async function changePass(){
 
 // ════ INIT ════
 window.addEventListener('DOMContentLoaded',async()=>{
+  initParticles();
   if(loadSess()&&AUTH.token){
     try{
       await api('GET','/auth/me',null,AUTH.token);
