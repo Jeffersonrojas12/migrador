@@ -3,6 +3,7 @@ const S={orig:'',dest:'',mod:'',files:{}};
 let WB=null;
 const LOGENTRIES=[];
 const EXCLUDED_RECORDS=[];
+const DEFAULTS_LOG=[];
 
 ['sorig','sdest','smod'].forEach(id=>document.getElementById(id).addEventListener('change',()=>{
   const o=document.getElementById('sorig').value,d=document.getElementById('sdest').value,m=document.getElementById('smod').value;
@@ -11,6 +12,7 @@ const EXCLUDED_RECORDS=[];
   const c=document.getElementById('compat');
   if(o&&d&&o!==d&&m){c.style.display='block';document.getElementById('ctxt').textContent=o+' -> '+d+' - '+m;}
   else c.style.display='none';
+
 }));
 
 function setStep(n){
@@ -55,11 +57,27 @@ function addLog(msg,lvl,fase){
   p.appendChild(d);p.scrollTop=p.scrollHeight;
   LOGENTRIES.push([ts,fase||null,lvl==='e'?'ERROR':lvl==='w'?'WARN':lvl==='o'?'OK':'INFO',msg,null,null]);
 }
-function setPStep(id,st){document.getElementById(id).className='ps '+st}
+function setPStep(id,st){
+  // Handle both: setPStep('ps0','ps act') and setPStep(2) numeric form
+  if(typeof id==='number'){
+    for(let i=0;i<=5;i++){
+      const el=document.getElementById('ps'+i);
+      if(!el)continue;
+      el.classList.toggle('act',i===id);
+      el.classList.toggle('don',i<id);
+    }
+  } else {
+    const el=document.getElementById(id);
+    if(el)el.className='ps '+st;
+  }
+}
 function setPct(pct,ph){
-  document.getElementById('pbar').style.width=pct+'%';
-  document.getElementById('pph').textContent=ph;
-  document.getElementById('ppct').textContent=pct+'%';
+  const pb=document.getElementById('pbar');
+  const pph=document.getElementById('pph');
+  const ppct=document.getElementById('ppct');
+  if(pb)pb.style.width=pct+'%';
+  if(pph)pph.textContent=ph||'';
+  if(ppct)ppct.textContent=pct+'%';
 }
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 
@@ -191,10 +209,10 @@ function tipoContrib(t,r){
   return 'Persona Natural No Responsable del IVA';
 }
 const CITY_MAP={'bogotá':'Bogotá, D.C.','bogota':'Bogotá, D.C.','bogota d.c.':'Bogotá, D.C.','bogotá d.c.':'Bogotá, D.C.'};
-function normCiudad(c){const k=String(c||'').trim().toLowerCase();return CITY_MAP[k]||String(c||'').trim()}
+function normCiudad(c){const k=String(c||'').trim().toLowerCase();if(!k||k==='nan'||k==='-')return 'Bogotá, D.C.';return CITY_MAP[k]||String(c||'').trim()||'Bogotá, D.C.';}
 function normTel(raw){
   const s=String(raw??'').trim();
-  if(!s||s==='nan'||s==='-'||s==='--'||s==='---')return '';
+  if(!s||s==='nan'||s==='-'||s==='--'||s==='---')return '3000000000';
   // Remove leading/trailing dashes and clean up
   const d=s.replace(/^-+|-+$/g,'').replace(/[^0-9\-\s\+\(\)]/g,'').trim();
   if(!d)return '';
@@ -206,7 +224,7 @@ function normTel(raw){
 const ADDR_REP=[[/\bcarrera\b/gi,'CR'],[/\bcra\.?\s*/gi,'CR '],[/\bcalle\b/gi,'CL'],[/\bcll\.?\s*/gi,'CL '],[/\bcl\.?\s*/gi,'CL '],[/\btransversal\b/gi,'TV'],[/\bdiagonal\b/gi,'DG'],[/\bavenida\b/gi,'AV'],[/\bav\.?\s*/gi,'AV '],[/\bnumero\b/gi,''],[/\bnum\.?\s*/gi,''],[/\bno\.?\s*/gi,' '],[/#/g,' '],[/-/g,' '],[/\./g,' '],[/,/g,' '],[/\s{2,}/g,' ']];
 function normAddr(raw){
   const s=String(raw||'').trim();
-  if(!s||s.toLowerCase()==='nan'||/^no aplica$/i.test(s)||s==='0'||s.length<3)return '';
+  if(!s||s.toLowerCase()==='nan'||/^no aplica$/i.test(s)||s==='0'||s.length<3)return 'DIRECCION NO INFORMADA';
   let r=s;
   ADDR_REP.forEach(([p,rep])=>r=r.replace(p,rep));
   r=r.trim().replace(/\s{2,}/g,' ').toUpperCase();
@@ -219,6 +237,7 @@ async function startETL(){
   if(!S.files.maestro){document.getElementById('sl-m').className='fslot bad';showA('a2','El archivo Busqueda de Terceros es obligatorio.');return}
   LOGENTRIES.length=0;
   EXCLUDED_RECORDS.length=0;
+  DEFAULTS_LOG.length=0;
   setStep(3);
   const t0=Date.now();
   try{
@@ -236,6 +255,15 @@ async function startETL(){
     let cliRows=[],proRows=[];
     const totalEntrada=maestro.data.length;
     addLog('Lectura: '+totalEntrada+' registros totales','o','Lectura de archivos');
+    // Empleados opcional
+    let cloudEmpIds=new Set();
+    if(S.files && S.files['empleados']){
+      try{
+        const empData=await escReadEmpleados(S.files['empleados']);
+        cloudEmpIds=empData.ids;
+        addLog('   Empleados: '+cloudEmpIds.size+' cédulas cargadas','i','Lectura de archivos');
+      }catch(e){addLog('   Empleados: error leyendo archivo','w','Lectura de archivos');}
+    }
     await sleep(250);setPStep('ps1','ps don');
 
     const H=maestro.hdrs;
@@ -264,13 +292,15 @@ async function startETL(){
       const esPrincipal=principalKey?String(r[principalKey]||'').toLowerCase().startsWith('s'):true;
       if(esPrincipal&&emailKey){const em=String(r[emailKey]||'').trim();if(em&&!emailMap[id])emailMap[id]=em;}
     });
-    const filtered=[],seen=new Set();
+    const filtered=[],seen=new Set(),nitExcluidos=[];
     maestro.data.forEach(r=>{
       const id=normId(r[cID]);
       if(!id||seen.has(id))return;
+      if(NITS_EXCLUIR.has(id)){nitExcluidos.push({id,nombre:String(r[cN]||'')});return;}
       seen.add(id);filtered.push({id,r});
     });
     addLog('Consolidacion: '+totalEntrada+' -> '+filtered.length+' registros unicos','o','Consolidacion de datos');
+    if(nitExcluidos.length>0) addLog('   '+nitExcluidos.length+' NITs excluidos (lista predefinida)','w','Consolidacion de datos');
     addLog('   Emails enriquecidos: '+Object.keys(emailMap).length,'i','Consolidacion de datos');
     await sleep(250);setPStep('ps2','ps don');
 
@@ -285,9 +315,16 @@ async function startETL(){
       const juridica=isNIT(tipoId);
       const regimen=String(r[cReg]||'No responsable de IVA');
       const estado=mapActivo(String(r[cEst]||'Activo'));
-      const telefono=normTel(r[cTel]??'');
-      const dir=normAddr(String(r[cDir]||''));
-      const ciudad=normCiudad(String(r[cCiu]||''));
+      const _rawTel=String(r[cTel]??'').trim();
+      const _rawDir=String(r[cDir]||'').trim();
+      const _rawCiu=String(r[cCiu]||'').trim();
+      const telefono=normTel(_rawTel);
+      const dir=normAddr(_rawDir);
+      const ciudad=normCiudad(_rawCiu);
+      const _defaults=[];
+      if(!_rawCiu||_rawCiu==='nan'||_rawCiu==='-') _defaults.push({campo:'Ciudad Identificación / Ciudad Dirección',valor_aplicado:'Bogotá, D.C.',motivo:'Campo vacío en origen'});
+      if(!_rawDir||_rawDir==='nan'||_rawDir.length<3) _defaults.push({campo:'Dirección',valor_aplicado:'DIRECCION NO INFORMADA',motivo:'Campo vacío en origen'});
+      if(!_rawTel||_rawTel==='nan'||_rawTel==='-') _defaults.push({campo:'Teléfonos',valor_aplicado:'3000000000',motivo:'Campo vacío en origen'});
       const email=cEmail?String(r[cEmail]||'').trim():(emailMap[id]||'');
       let p1='',p2='',a1='',a2='';
       if(juridica){p1=nombre;}
@@ -315,7 +352,7 @@ async function startETL(){
         'Tipo Contribuyente *':tipoContrib(tipoId,regimen),
         'Clasi. Administrador Impuesto *':'Normal',
         'Excepcion Impuesto':null,
-        'Tarifa Reteica Compras':0.00966,
+        'Tarifa Reteica Compras':9.66,
         'Aplica Reteica Ventas':null,
         'Maneja Cupo Credito':null,
         'Vendedor':null,'Lista Precios':null,'Forma Pago':null,
@@ -327,7 +364,8 @@ async function startETL(){
         'Email *':email||null,
         'Ciudad Direccion *':ciudad,
         'Zona':null,'Barrio':null
-      });
+      })
+      if(_defaults.length>0) _defaults.forEach(d=>DEFAULTS_LOG.push({id:idNum,nombre:p1,campo:d.campo,valor_aplicado:d.valor_aplicado,motivo:d.motivo}));;
     });
     addLog('Transformacion: '+out.length+' registros, 30 campos','o','Transformacion de datos');
     if(warns>0)addLog('   '+warns+' personas naturales sin apellido','w','Transformacion de datos');
@@ -347,7 +385,7 @@ async function startETL(){
     const _stats={archivos_entrada:1,registros_entrada:totalEntrada,
       registros_consolidados:filtered.length,registros_transformados:out.length,
       errores:errCount,warnings:warns};
-    WB=buildWB(out, LOGENTRIES, _stats, EXCLUDED_RECORDS);
+    WB=buildWB(out, LOGENTRIES, _stats, EXCLUDED_RECORDS, cloudEmpIds, DEFAULTS_LOG, nitExcluidos);
     const dur=((Date.now()-t0)/1000).toFixed(1);
     addLog('Excel generado en '+dur+'s - 7 hojas','o','Escritura de archivo');
     addLog('=================================','o',null);
@@ -374,6 +412,8 @@ async function startETL(){
 }
 
 const COLS=['Tipo Identificacion *','Identificacion *','Ciudad Identificacion*','Primer Nombre o Razon Social*','Segundo Nombre','Primer Apellido *','Segundo Apellido','Tipo Tercero *','Codigo','Activo','Actividad Economica','Tipo Contribuyente *','Clasi. Administrador Impuesto *','Excepcion Impuesto','Tarifa Reteica Compras','Aplica Reteica Ventas','Maneja Cupo Credito','Vendedor','Lista Precios','Forma Pago','Plazo Dias','Porcentaje Descuento','Tipo Direccion *','Nombre Direccion *','Direccion *','Telefonos *','Email *','Ciudad Direccion *','Zona','Barrio'];
+
+const NITS_EXCLUIR = new Set(["891800330","899999063","890203183","890399010","891500319","890102257","800118954","891080031","890480123","890980040","800197268","800148514","805001157","899999034","890903790","860022137","800256161","860002503","899999061","860034594","900604350","830074184","800130907","900914254","800229739","860011153","800224808","809008362","800216278","830125132","800253055","900156264","830054904","837000084","860008645","830008686","890903937","899999001","901037916","899999734","899999284","800112806","800088702","901543761","800251440","830003564","890904996","901093846","824001398","222222222","830009783","900226715","805000427","900406150","890806490","860066942","804002105","901469580","800219488","890303093","890700148","890201578","890000381","890480023","890900842","800211025","892200015","891200337","890500675","890500516","890303208","891480000","891180008","891600091","890480110","890900840","890101994","890900841","860045904","891080005","892399989","891500182","844003392","891190047","891800213","800231969","890102002","860007336","860002183","800226175","800227940","892000146","800149496","891280008","892115006","860007379","891856000","900298372","890200106","892400320","890102044","891780093","860013570","800140949","890704737","800003122","890270275","800147502","860003020","890903938","860043186","900200960","860007738","890200756","860050750","890300279","860002964","860034313","890203088","860035827","860051135","860007335","800037800","806008394","900935126","899999107","839000495","830113831","860503617","800138188","900336004","817001773"]);
 const COLS_DISPLAY=['Tipo Identificaci\u00f3n *','Identificaci\u00f3n *','Ciudad Identificaci\u00f3n*','Primer Nombre \u00f3 Razon Social*','Segundo Nombre','Primer Apellido *','Segundo Apellido','Tipo Tercero\u00a0*','C\u00f3digo','Activo','Actividad Econ\u00f3mica','Tipo Contribuyente *','Clasi. Administrador Impuesto *','Excepci\u00f3n Impuesto','Tarifa Reteica Compras','Aplica Reteica Ventas','Maneja Cupo Cr\u00e9dito','Vendedor','Lista Precios','Forma Pago','Plazo D\u00edas','Porcentaje Descuento','Tipo Direcci\u00f3n *','Nombre Direcci\u00f3n *','Direcci\u00f3n *','Tel\u00e9fonos *','Email *','Ciudad Direcci\u00f3n *','Zona','Barrio'];
 const TIPOS_ID=['C\u00e9dula de ciudadan\u00eda','C\u00e9dula de Extranjer\u00eda','Documento de Identificaci\u00f3n Extranjero','NIT','Pasaporte','Permiso Especial de Permanencia','Registro Civil','Sin ID del exterior o para uso definido por DIAN','Tarjeta de Extranjer\u00eda','Tarjeta de Identidad'];
 const TIPOS_CONTRIB=['Persona Natural Responsable del IVA','Persona Natural No Responsable del IVA','Persona Jur\u00eddica','Grande Contribuyente No Autorretenedor','Grande Contribuyente Autorretenedor','Persona Jur\u00eddica Autorretenedor','Persona Natural Autorretenedor','Tercero del Exterior','Proveedor Sociedades de Comercio Internacional','R\u00e9gimen Simple de Tributaci\u00f3n Persona Jur\u00eddica','R\u00e9gimen Simple de Tributaci\u00f3n Persona Natural','Entidades Sin Animo De Lucro','Persona Natural Regimen Com\u00fan Agente Retenedor','Persona Natural o Jur\u00eddica Ley 1429','Instituciones del Estado Publicos y Otros'];
@@ -387,7 +427,7 @@ const ACTIVIDADES=["0010",1011,1012,1020,1030,1040,1051,1052,1061,1062,1063,1071
 let LISTAS01_DATA=null;
 
 
-function buildWB(rows, logEntries, stats, excluded){
+function buildWB(rows, logEntries, stats, excluded, empIds, defaultsLog, nitExcluidos){
   const wb=XLSX.utils.book_new();
   const aoa=[];
   const sec=new Array(30).fill(null);sec[0]='Ficha Principal';sec[22]='Ficha Dirección';
@@ -419,7 +459,42 @@ function buildWB(rows, logEntries, stats, excluded){
   const exclAoa=[['Identificación','Nombre o Razón Social','Propiedad Activa']];
   (excluded||[]).forEach(e=>exclAoa.push([e.id,e.nombre,e.tipo]));
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(exclAoa),'IdentificacionesExcluidas');
-  return wb;
+  
+  // Hoja empleados (solo si se cargó archivo de empleados)
+  if(empIds && empIds.size > 0){
+    const empRows = rows.filter(r => {
+      const id = String(r[1]||'').replace(/[^0-9]/g,'');
+      return empIds.has(id);
+    });
+    if(empRows.length > 0){
+      const empAoa = [COLS.slice()];
+      empRows.forEach(r => {
+        const rowCopy = r.slice();
+        // Col 7 = Tipo Tercero / Propiedad Activa → solo "Empleado"
+        rowCopy[7] = 'Empleado';
+        empAoa.push(rowCopy);
+      });
+      const wsEmp = XLSX.utils.aoa_to_sheet(empAoa);
+      XLSX.utils.book_append_sheet(wb, wsEmp, 'Empleados');
+    }
+  }
+
+
+  // Hoja: Campos aplicados por defecto
+  if(defaultsLog && defaultsLog.length > 0){
+    const defAoa=[['Identificación','Nombre o Razón Social','Campo','Valor Aplicado','Motivo']];
+    defaultsLog.forEach(d=>defAoa.push([d.id, d.nombre, d.campo, d.valor_aplicado, d.motivo]));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(defAoa), 'Campos por Defecto');
+  }
+
+  // Hoja: NITs Excluidos
+  if(nitExcluidos && nitExcluidos.length > 0){
+    const nitAoa=[['Identificación','Nombre o Razón Social','Motivo']];
+    nitExcluidos.forEach(d=>nitAoa.push([d.id, d.nombre, 'NIT excluido — lista predefinida']));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(nitAoa), 'NITs Excluidos');
+  }
+
+return wb;
 }
 
 function buildFN(){
