@@ -105,6 +105,38 @@ function empSetPct(pct,msg){
   if(ph&&msg) ph.textContent=msg;
 }
 
+// ── Inventarios: ir a archivos ───────────────────────────────────
+function invGoFiles(){
+  const orig=document.getElementById('inv-sorig')?.value;
+  const dest=document.getElementById('inv-sdest')?.value;
+  const mod=document.getElementById('inv-smod')?.value;
+  const a=document.getElementById('inv-a1');
+  if(!orig){if(a){a.textContent='Selecciona el software de origen.';a.style.display='block';}return;}
+  if(!dest){if(a){a.textContent='Selecciona el software de destino.';a.style.display='block';}return;}
+  if(!mod) {if(a){a.textContent='Selecciona el módulo.';a.style.display='block';}return;}
+  if(a) a.style.display='none';
+  if(typeof invSetStep==='function') invSetStep(2);
+}
+function routeInvETL(){
+  const dest=document.getElementById('inv-sdest')?.value;
+  const lbl=document.getElementById('inv-dl-dest');
+  if(dest==='World Office Cloud'){
+    if(lbl)lbl.textContent='Para importar en World Office Cloud';
+    if(typeof startInvCldETL==='function') startInvCldETL();
+  } else {
+    if(lbl)lbl.textContent='Para importar en World Office Escritorio';
+    if(typeof startInvETL==='function') startInvETL();
+  }
+}
+function routeInvDownload(){
+  const dest=document.getElementById('inv-sdest')?.value;
+  if(dest==='World Office Cloud'){
+    if(typeof invCldDoDownload==='function') invCldDoDownload();
+  } else {
+    if(typeof invDoDownload==='function') invDoDownload();
+  }
+}
+
 // ── Empleados: pasos propios ──────────────────────────────────────
 function empSetStep(n){
   for(let i=1;i<=4;i++){
@@ -297,6 +329,15 @@ function showPg(name){
   if(name==='empleados'){
     // Full reset of empleados state
     empReset();
+  }
+  if(name==='inventarios'){
+    setTimeout(()=>{
+      if(typeof invReset==='function') invReset();
+      if(typeof invCldReset==='function') invCldReset();
+      ['inv-s2','inv-s3','inv-s4'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
+      const s1=document.getElementById('inv-s1'); if(s1)s1.style.display='block';
+      const wt1=document.getElementById('inv-wt1'); if(wt1)wt1.className='wz on';
+    },10);
   }
 }
 
