@@ -477,11 +477,110 @@
 
       <!-- ═══ SALDOS ═══ -->
       <div class="pg" id="pg-saldos">
-        <div class="ph"><h1>Saldos Iniciales</h1><p>Módulo en desarrollo · Próximamente disponible</p></div>
-        <div class="card" style="text-align:center;padding:60px 20px">
-          <div style="font-size:48px;margin-bottom:16px">🚧</div>
-          <div style="font-size:18px;font-weight:600;margin-bottom:8px">Módulo en desarrollo</div>
-          <div style="color:var(--t2);font-size:14px">Este módulo estará disponible próximamente.</div>
+        <div class="ph"><h1>Saldos Iniciales Contables</h1><p>Siigo Nube → World Office · Balance de prueba por tercero</p></div>
+        <div class="wizard">
+          <div class="wz on" id="sal-wt1"><div class="wz-n">1</div><span>Configurar</span></div>
+          <div class="wz-line"></div>
+          <div class="wz" id="sal-wt2"><div class="wz-n">2</div><span>Archivo</span></div>
+          <div class="wz-line"></div>
+          <div class="wz" id="sal-wt3"><div class="wz-n">3</div><span>Pipeline</span></div>
+          <div class="wz-line"></div>
+          <div class="wz" id="sal-wt4"><div class="wz-n">4</div><span>Resultado</span></div>
+        </div>
+
+        <!-- S1: Config -->
+        <div id="sal-s1">
+          <div class="card">
+            <div class="card-h"><div class="card-ico">⚙️</div><div><div class="card-t">Configuración</div><div class="card-s">Define origen, destino y módulo</div></div></div>
+            <div style="display:flex;gap:16px;flex-wrap:nowrap;">
+              <div style="flex:1;min-width:0">
+                <div class="f-lbl">Software origen *</div>
+                <select class="f-sel" id="sal-sorig" style="width:100%">
+                  <option value="">— Selecciona —</option>
+                  <option value="Siigo Nube">Siigo Nube</option>
+                </select>
+              </div>
+              <div style="flex:1;min-width:0">
+                <div class="f-lbl">Software destino *</div>
+                <select class="f-sel" id="sal-sdest" style="width:100%">
+                  <option value="">— Selecciona —</option>
+                  <option value="World Office Escritorio">World Office Escritorio</option>
+                  <option value="World Office Cloud">World Office Cloud</option>
+                </select>
+              </div>
+              <div style="flex:1;min-width:0">
+                <div class="f-lbl">Módulo *</div>
+                <select class="f-sel" id="sal-smod" style="width:100%">
+                  <option value="">— Selecciona —</option>
+                  <option value="Saldos Iniciales">Saldos Iniciales</option>
+                </select>
+              </div>
+            </div>
+            <div id="sal-a1" style="display:none;color:var(--red);font-size:12px;margin-top:8px"></div>
+            <div class="btn-row" style="margin-top:16px">
+              <button class="btn btn-p" onclick="salGoFiles()">Continuar → Archivo</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- S2: Archivo -->
+        <div id="sal-s2" style="display:none">
+          <div class="card">
+            <div class="card-h"><div class="card-ico">📁</div><div><div class="card-t">Archivo de entrada</div><div class="card-s" id="sal-fsub">Balance de prueba por tercero</div></div></div>
+            <div class="al al-i" style="margin-bottom:14px">
+              <span>ℹ️</span><span>Siigo: <strong>Contabilidad → Informes → Balance de Prueba por Tercero → Exportar Excel</strong></span>
+            </div>
+            <div class="fslots">
+              <div class="fslot" id="sl-sal-m">
+                <input type="file" id="f-sal-m" accept=".xlsx,.xls" onchange="onFile(this,'sl-sal-m','nm-sal-m','sal-maestro')">
+                <div class="fs-badge badge-req">Obligatorio</div>
+                <div class="fs-ico">📊</div>
+                <div class="fs-name">Balance_prueba_tercero.xlsx</div>
+                <div class="fs-desc">Balance de prueba por tercero de Siigo Nube</div>
+                <div class="fs-sel" id="nm-sal-m"></div>
+              </div>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-s" onclick="salSetStep(1)">← Volver</button>
+              <button class="btn btn-p" onclick="routeSalETL()">🚀 Ejecutar migración</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- S3: Pipeline -->
+        <div id="sal-s3" style="display:none">
+          <div class="card">
+            <div class="card-h"><div class="card-ico">⚡</div><div><div class="card-t">Pipeline ETL en ejecución</div><div class="card-s" id="sal-pph">Iniciando...</div></div></div>
+            <div class="pipeline">
+              <div class="ps" id="sal-ps0">📖 Lectura</div><div class="ps-arr">→</div>
+              <div class="ps" id="sal-ps1">📁 Archivo</div><div class="ps-arr">→</div>
+              <div class="ps" id="sal-ps2">🔗 Filtrado</div><div class="ps-arr">→</div>
+              <div class="ps" id="sal-ps3">🔧 Cuentas</div><div class="ps-arr">→</div>
+              <div class="ps" id="sal-ps4">📤 Excel</div><div class="ps-arr">→</div>
+              <div class="ps" id="sal-ps5">✅ Listo</div>
+            </div>
+            <div class="pbar-wrap"><div class="pbar"><div class="pbar-inner" id="sal-pbar" style="width:0%"></div></div><span id="sal-ppct">0%</span></div>
+            <div class="log-panel" id="sal-logp"></div>
+          </div>
+        </div>
+
+        <!-- S4: Resultado -->
+        <div id="sal-s4" style="display:none">
+          <div class="res-hero"><div class="res-ico">🎉</div><div class="res-t">Migración completada</div></div>
+          <div class="stats">
+            <div class="stat sv-b"><div class="stat-v" id="sal-st-in">—</div><div class="stat-l">Entrada</div></div>
+            <div class="stat sv-g"><div class="stat-v" id="sal-st-ok">—</div><div class="stat-l">Registros</div></div>
+            <div class="stat sv-a"><div class="stat-v" id="sal-st-deb">—</div><div class="stat-l">Total Débitos</div></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><div class="card-ico">📥</div><div><div class="card-t">Archivo listo</div><div class="card-s">Para importar en World Office</div></div></div>
+            <button class="dl-btn" onclick="routeSalDownload()">
+              <div class="dl-ico">📊</div>
+              <div><div class="dl-fn" id="sal-dl-fn">saldos_iniciales.xlsx</div><div class="dl-meta">Excel · 40 columnas · WO</div></div>
+              <div class="dl-arr">⬇</div>
+            </button>
+          </div>
+          <div class="btn-row"><button class="btn" onclick="salReset()">+ Nueva Migración</button></div>
         </div>
       </div>
 
@@ -525,102 +624,8 @@
       <button class="btn btn-s" onclick="closeEdit()">Cancelar</button>
       <button class="btn btn-p" onclick="saveEdit()">Guardar</button>
 
-      <!-- ═══ INVENTARIOS ═══ -->
-      <div class="pg" id="pg-inventarios">
-        <div class="ph"><h1>Migración de Inventarios</h1><p>Siigo Nube → World Office Escritorio · Productos y Servicios</p></div>
-        <div class="wizard">
-          <div class="wz on" id="inv-wt1"><div class="wz-n">1</div><span>Configurar</span></div>
-          <div class="wz-line"></div>
-          <div class="wz" id="inv-wt2"><div class="wz-n">2</div><span>Archivo</span></div>
-          <div class="wz-line"></div>
-          <div class="wz" id="inv-wt3"><div class="wz-n">3</div><span>Pipeline</span></div>
-          <div class="wz-line"></div>
-          <div class="wz" id="inv-wt4"><div class="wz-n">4</div><span>Resultado</span></div>
-        </div>
-
-        <!-- S1: Config -->
-        <div id="inv-s1">
-          <div class="card">
-            <div class="card-h"><div class="card-ico">⚙️</div><div><div class="card-t">Configuración</div><div class="card-s">Define origen y destino</div></div></div>
-            <div style="display:flex;gap:16px;flex-wrap:nowrap;">
-              <div style="flex:1;min-width:0"><div class="f-lbl">Software origen *</div>
-                <select class="f-sel" style="width:100%" disabled><option>Siigo Nube</option></select></div>
-              <div style="flex:1;min-width:0"><div class="f-lbl">Software destino *</div>
-                <select class="f-sel" style="width:100%" disabled><option>World Office Escritorio</option></select></div>
-              <div style="flex:1;min-width:0"><div class="f-lbl">Módulo *</div>
-                <select class="f-sel" style="width:100%" disabled><option>Inventarios</option></select></div>
-            </div>
-            <div style="margin-top:16px">
-              <button class="btn btn-p" onclick="invSetStep(2)">Continuar → Archivo</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- S2: Archivo -->
-        <div id="inv-s2" style="display:none">
-          <div class="card">
-            <div class="card-h"><div class="card-ico">📁</div><div><div class="card-t">Archivo de entrada</div><div class="card-s">Exportación de Siigo Nube</div></div></div>
-            <div class="fslots">
-              <div class="fslot" id="sl-inv-m">
-                <input type="file" id="f-inv-m" accept=".xlsx,.xls" onchange="onFile(this,'sl-inv-m','nm-inv-m','inv-maestro')">
-                <div class="fs-badge badge-req">Obligatorio</div>
-                <div class="fs-ico">📦</div>
-                <div class="fs-name">Listado_de_productos___Servicios.xlsx</div>
-                <div class="fs-desc">Exportación directa de Siigo Nube</div>
-                <div class="fs-sel" id="nm-inv-m"></div>
-              </div>
-            </div>
-            <div class="btn-row">
-              <button class="btn btn-s" onclick="invSetStep(1)">← Volver</button>
-              <button class="btn btn-p" onclick="routeInvETL()">🚀 Ejecutar migración</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- S3: Pipeline -->
-        <div id="inv-s3" style="display:none">
-          <div class="card">
-            <div class="card-h"><div class="card-ico">⚡</div><div><div class="card-t">Pipeline ETL en ejecución</div><div class="card-s" id="inv-pph">Iniciando...</div></div></div>
-            <div class="pipeline">
-              <div class="ps" id="inv-ps0">📖 Lectura</div><div class="ps-arr">→</div>
-              <div class="ps" id="inv-ps1">📁 Archivo</div><div class="ps-arr">→</div>
-              <div class="ps" id="inv-ps2">🔗 Consolidación</div><div class="ps-arr">→</div>
-              <div class="ps" id="inv-ps3">🔧 Transformación</div><div class="ps-arr">→</div>
-              <div class="ps" id="inv-ps4">📤 Generación Excel</div><div class="ps-arr">→</div>
-              <div class="ps" id="inv-ps5">✅ Listo</div>
-            </div>
-            <div class="pbar-wrap"><div class="pbar"><div class="pbar-inner" id="inv-pbar" style="width:0%"></div></div><span id="inv-ppct">0%</span></div>
-            <div class="log-panel" id="inv-logp"></div>
-          </div>
-        </div>
-
-        <!-- S4: Resultado -->
-        <div id="inv-s4" style="display:none">
-          <div class="res-hero"><div class="res-ico">🎉</div><div class="res-t">Migración completada</div></div>
-          <div class="stats">
-            <div class="stat sv-b"><div class="stat-v" id="inv-st-in">—</div><div class="stat-l">Entrada</div></div>
-            <div class="stat sv-g"><div class="stat-v" id="inv-st-ok">—</div><div class="stat-l">Migrados</div></div>
-          </div>
-          <div class="card">
-            <div class="card-h"><div class="card-ico">📥</div><div><div class="card-t">Archivo listo</div><div class="card-s">Para importar en World Office Escritorio</div></div></div>
-            <button class="dl-btn" onclick="routeInvDownload()">
-              <div class="dl-ico">📦</div>
-              <div><div class="dl-fn" id="inv-dl-fn">inventarios_migrados.xlsx</div><div class="dl-meta">Excel · 88 columnas · WO Escritorio</div></div>
-              <div class="dl-arr">⬇</div>
-            </button>
-          </div>
-          <div class="btn-row"><button class="btn" onclick="invReset()">+ Nueva Migración</button></div>
-        </div>
-      </div>
-      <!-- ═══ SALDOS ═══ -->
-      <div class="pg" id="pg-saldos">
-        <div class="ph"><h1>Saldos Iniciales</h1><p>Módulo en desarrollo · Próximamente disponible</p></div>
-        <div class="card" style="text-align:center;padding:60px 20px">
-          <div style="font-size:48px;margin-bottom:16px">🚧</div>
-          <div style="font-size:18px;font-weight:600;margin-bottom:8px">Módulo en desarrollo</div>
-          <div style="color:var(--t2);font-size:14px">Este módulo estará disponible próximamente.</div>
-        </div>
-      </div>
+            <!-- ═══ SALDOS ═══ -->
+      <div cla
       <!-- ═══ MOVIMIENTOS ═══ -->
       <div class="pg" id="pg-movimientos">
         <div class="ph"><h1>Movimientos Contables</h1><p>Módulo en desarrollo · Próximamente disponible</p></div>
@@ -643,6 +648,8 @@
   <script src="js/terceros/terceros_siigo_nube_to_wo_escritorio.js?v=770932"></script>
   <script src="js/inventarios/inventarios_siigo_nube_to_wo_cloud.js?v=770932"></script>
   <script src="js/inventarios/inventarios_siigo_nube_to_wo_escritorio.js?v=770932"></script>
+  <script src="js/saldos/saldos_siigo_nube_to_wo_escritorio.js?v=770932"></script>
+  <script src="js/saldos/saldos_siigo_nube_to_wo_cloud.js?v=770932"></script>
   <script src="js/terceros/terceros_listas01_data.js?v=770932" defer></script>
 </body>
 </html>
