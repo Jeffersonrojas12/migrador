@@ -105,6 +105,37 @@ function empSetPct(pct,msg){
   if(ph&&msg) ph.textContent=msg;
 }
 
+// ── Saldos: ir a archivos ────────────────────────────────────────
+function salGoFiles(){
+  const orig=document.getElementById('sal-sorig')?.value;
+  const dest=document.getElementById('sal-sdest')?.value;
+  const mod=document.getElementById('sal-smod')?.value;
+  const a=document.getElementById('sal-a1');
+  if(!orig){if(a){a.textContent='Selecciona el software de origen.';a.style.display='block';}return;}
+  if(!dest){if(a){a.textContent='Selecciona el software de destino.';a.style.display='block';}return;}
+  if(!mod) {if(a){a.textContent='Selecciona el módulo.';a.style.display='block';}return;}
+  if(a)a.style.display='none';
+  const fsub=document.getElementById('sal-fsub');
+  if(fsub)fsub.textContent=orig+' → '+dest+' - '+mod;
+  if(typeof salSetStep==='function') salSetStep(2);
+}
+function routeSalETL(){
+  const dest=document.getElementById('sal-sdest')?.value;
+  if(dest==='World Office Cloud'){
+    if(typeof startSalCldETL==='function') startSalCldETL();
+  } else {
+    if(typeof startSalETL==='function') startSalETL();
+  }
+}
+function routeSalDownload(){
+  const dest=document.getElementById('sal-sdest')?.value;
+  if(dest==='World Office Cloud'){
+    if(typeof salCldDoDownload==='function') salCldDoDownload();
+  } else {
+    if(typeof salDoDownload==='function') salDoDownload();
+  }
+}
+
 // ── Inventarios: ir a archivos ───────────────────────────────────
 function invGoFiles(){
   const orig=document.getElementById('inv-sorig')?.value;
@@ -337,6 +368,15 @@ function showPg(name){
       ['inv-s2','inv-s3','inv-s4'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
       const s1=document.getElementById('inv-s1'); if(s1)s1.style.display='block';
       const wt1=document.getElementById('inv-wt1'); if(wt1)wt1.className='wz on';
+    },10);
+  }
+  if(name==='saldos'){
+    setTimeout(()=>{
+      if(typeof salReset==='function') salReset();
+      if(typeof salCldReset==='function') salCldReset();
+      ['sal-s2','sal-s3','sal-s4'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
+      const s1=document.getElementById('sal-s1');if(s1)s1.style.display='block';
+      const wt1=document.getElementById('sal-wt1');if(wt1)wt1.className='wz on';
     },10);
   }
 }
