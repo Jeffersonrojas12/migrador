@@ -298,6 +298,12 @@ async function startEmpEscETL(){
         'Tipo Sena': null,
         'Fecha Fin Periodo Prueba': null,
         'Fecha Fin Contrato': fechaFin||null,
+        // Store originals for modal mapping
+        '_orig_ARL':  c[cARL]  ? String(c[cARL]).trim()  : '',
+        '_orig_EPS':  c[cEPS]  ? String(c[cEPS]).trim()  : '',
+        '_orig_Pen':  c[cPen]  ? String(c[cPen]).trim()  : '',
+        '_orig_FCes': c[cFCes] ? String(c[cFCes]).trim() : '',
+        '_orig_Caja': c[cCaja] ? String(c[cCaja]).trim() : '',
         'ARL': c[cARL] ? empEscMap(c[cARL], EMP_ESC_ARL) : null,
         'Fecha Afil. ARL': fechaIngreso||null,
         'Tarifa ARL': c[cRiesgo] ? (String(c[cRiesgo]).match(/(\d+[,.]\d+)/)||[''])[0].replace('.',',') : null,
@@ -476,18 +482,22 @@ const EMP_MAP_COLS = {
 
 function empShowMapModal(rows){
   // Collect unique values per entity column
+  // Use ORIGINAL values from Siigo (before mapping) for the modal
+  const origKeys = {'ARL':'_orig_ARL','EPS':'_orig_EPS',
+    'Pensión':'_orig_Pen','Fondo Cesantias':'_orig_FCes','Caja de Compensacion':'_orig_Caja'};
   const entities = {};
   Object.keys(EMP_MAP_COLS).forEach(col=>{
+    const origKey = origKeys[col] || col;
     const vals = new Set();
-    rows.forEach(r=>{ if(r[col]) vals.add(String(r[col]).trim()); });
+    rows.forEach(r=>{ const v=r[origKey]; if(v) vals.add(String(v).trim()); });
     if(vals.size>0) entities[col] = [...vals].sort();
   });
 
   // Build modal sections
   const container = document.getElementById('emp-map-sections');
-  if(!container) return;
+  if(!container){ console.error('emp-map-sections not found'); return; }
   container.innerHTML='';
-
+  
   Object.entries(entities).forEach(([col, vals])=>{
     const cfg = EMP_MAP_COLS[col];
     const section = document.createElement('div');
@@ -514,10 +524,13 @@ function empShowMapModal(rows){
     container.appendChild(section);
   });
 
-  // Show modal and start canvas particles
+  // Show modal
   const modal = document.getElementById('emp-map-modal');
   if(modal){ modal.style.display='block'; modal.scrollTop=0; }
-  setTimeout(()=>{ if(typeof makeParticles==='function') makeParticles('modal-canvas',60,0.5,0.5); },100);
+  setTimeout(()=>{
+    const btn = document.getElementById('emp-map-confirm-btn');
+    if(btn) btn.addEventListener('click', empMapConfirm);
+  },50);
 }
 
 function empMapConfirm(){
@@ -525,10 +538,7 @@ function empMapConfirm(){
   const errEl = document.getElementById('emp-map-err');
   const inputs = modal ? modal.querySelectorAll('input[data-col]') : [];
 
-  // Validate all filled
-  let missing = false;
-  inputs.forEach(inp=>{ if(!inp.value.trim()){ inp.style.borderColor='rgba(239,68,68,.6)'; missing=true; } });
-  if(missing){ if(errEl) errEl.style.display='block'; return; }
+  // Empty fields = keep the auto-mapped value (not blocking)
   if(errEl) errEl.style.display='none';
 
   // Build mapping
@@ -544,11 +554,16 @@ function empMapConfirm(){
   if(!_empEscPending){ if(modal) modal.style.display='none'; return; }
   const {out, stats, excluded, cargos, centrosTrab, centrosCost, defaults, dur, totalEntrada} = _empEscPending;
 
+  // Apply mapping using original values as lookup key
+  const origKeys2 = {'ARL':'_orig_ARL','EPS':'_orig_EPS',
+    'Pensión':'_orig_Pen','Fondo Cesantias':'_orig_FCes','Caja de Compensacion':'_orig_Caja'};
   out.forEach(row=>{
     Object.keys(EMP_MAP_COLS).forEach(col=>{
       const key = EMP_MAP_COLS[col].rowKey;
-      if(row[key] && mapping[col] && mapping[col][row[key]]){
-        row[key] = mapping[col][row[key]];
+      const origKey = origKeys2[col] || col;
+      const origVal = row[origKey] || '';
+      if(origVal && mapping[col] && mapping[col][origVal]){
+        row[key] = mapping[col][origVal];
       }
     });
   });
