@@ -8,6 +8,36 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Syne:wght@400;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="css/app.css">
 </head>
 <body>
+<!-- ════ EMP MAPPING MODAL ════ -->
+<div id="emp-map-modal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9999;overflow:auto">
+  <div style="position:relative;z-index:1;min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:40px 20px;
+    background:linear-gradient(135deg,#1a1060 0%,#2d1b8e 30%,#4a2db8 60%,#6040d0 100%)">
+    <div style="width:100%;max-width:860px">
+      <div style="text-align:center;margin-bottom:28px">
+        <img src="img/wo_cloud_logo.png" style="width:80px;height:auto;filter:drop-shadow(0 4px 20px rgba(100,80,255,.5))">
+        <div style="font-size:22px;font-weight:700;color:#fff;margin-top:12px">Mapeo de Entidades</div>
+        <div style="font-size:13px;color:rgba(255,255,255,.5);margin-top:4px;font-family:monospace">
+          Ingresa el nombre exacto en World Office Escritorio para cada entidad encontrada
+        </div>
+      </div>
+      <div id="emp-map-sections"></div>
+      <div style="text-align:center;margin-top:24px">
+        <div id="emp-map-err" style="color:#fca5a5;font-size:13px;margin-bottom:12px;display:none">
+          ⚠ Completa todos los campos antes de continuar
+        </div>
+        <button id="emp-map-confirm-btn" style="padding:13px 48px;
+          background:linear-gradient(135deg,#5b4fcf,#7c6ef0);
+          border:1px solid rgba(255,255,255,.15);border-radius:10px;color:#fff;
+          font-size:15px;font-weight:700;cursor:pointer;
+          box-shadow:0 4px 20px rgba(91,79,207,.4)">
+          ✅ Confirmar y exportar Excel
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
 <!-- ════ AUTH ════ -->
 <div id="auth-screen">
   <canvas id="auth-canvas"></canvas>
@@ -651,5 +681,9 @@
   <script src="js/saldos/saldos_siigo_nube_to_wo_escritorio.js?v=770932"></script>
   <script src="js/saldos/saldos_siigo_nube_to_wo_cloud.js?v=770932"></script>
   <script src="js/terceros/terceros_listas01_data.js?v=770932" defer></script>
+
+
+
+
 </body>
 </html>
