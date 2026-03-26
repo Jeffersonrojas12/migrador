@@ -194,13 +194,165 @@ function mapTipoId(raw){
   return TIPO_ID_MAP[k]||String(raw||'');
 }
 function isNIT(t){return String(t||'').toLowerCase().includes('nit')}
-function splitName(full){
-  const w=String(full||'').trim().toUpperCase().split(/\s+/).filter(Boolean);
-  if(!w.length)return{p1:'',p2:'',a1:'',a2:''};
-  if(w.length===1)return{p1:w[0],p2:'',a1:'',a2:''};
-  if(w.length===2)return{p1:w[0],p2:'',a1:w[1],a2:''};
-  if(w.length===3)return{p1:w[0],p2:w[1],a1:w[2],a2:''};
-  return{p1:w[0],p2:w[1],a1:w[2],a2:w.slice(3).join(' ')};
+// ── Separación de nombres (dev.zip AINameSplitter) ───────────────
+// Reglas:
+//   NIT/empresa (SAS,LTDA,CORP,INC) → razón social completa en p1
+//   Conectores (DE,DEL,LA,LAS,LOS,Y,E,I) forman token propio con la palabra siguiente
+//   1 token  → p1
+//   2 tokens → p1, a1
+//   3 tokens → si token[1] es nombre conocido → p1,p2,a1 / si no → p1,a1,a2
+//   4+ tokens → p1, p2, a1, a2
+
+const TERC_NOMBRES_SET = new Set([
+  'ALEXANDER','ALEJANDRO','ALEXIS','ANDRES','ANGEL','ANTONIO','ARTURO',
+  'CAMILO','CARLOS','CRISTIAN','CRISTINA','DANIEL','DAVID','DIEGO',
+  'EDGAR','EDUARDO','ELENA','ELIANA','EMILIO','FABIAN','FELIPE','FERNANDO',
+  'FRANCISCO','FREDDY','GABRIEL','GERMAN','GLORIA','GUSTAVO','HAROLD',
+  'HECTOR','HERNAN','HUGO','IVAN','JAVIER','JEFFERSON','JENNIFER','JESSICA',
+  'JHON','JORGE','JOSE','JUAN','JULIAN','JULIO','KAREN','LAURA','LEIDY',
+  'LEONARDO','LILIANA','LINA','LUIS','LUZ','MANUEL','MARCELA','MARIA',
+  'MARIO','MARTHA','MAURICIO','MIGUEL','NATALIA','NICOLAS','OSCAR','PABLO',
+  'PAOLA','PATRICIA','PEDRO','RAFAEL','RAUL','RICARDO','ROBERTO','RODRIGO',
+  'ROSA','RUBEN','SAMUEL','SANDRA','SANTIAGO','SERGIO','SILVIA','SOFIA',
+  'STEPHANIE','TATIANA','VALENTINA','VICTOR','WILLIAM','WILSON','XIOMARA',
+  'YESENIA','YOLANDA','ZULMA','ALBA','BEATRIZ','BRAYAN','BRYAN','CAROLINA',
+  'CESAR','CLAUDIA','DIANA','DUVAN','ELISA','FELIX','GIOVANNY',
+  'ISABELLA','JACKELINE','JAIME','JENNY','JHONATAN','JOHANA','JONATHAN',
+  'KATHERINE','KELLY','LEANDRO','LORENA','LUISA','MANUELA','MARIANA',
+  'MELISSA','MICHAEL','MILLER','NELSON','OLGA','OMAR','ORLANDO',
+  'RUBIELA','SEBASTIAN','VANESSA','VERONICA','VIVIANA','YAMILE',
+  'YEISON','YENNY','ASTRID','BLANCA','CONSUELO','DARIO','ELIZABETH',
+  'ERNESTO','ESPERANZA','ESTEBAN','EUGENIO','FRANCO','FREDY','GIOVANNI',
+  'GLADYS','GONZALO','IGNACIO','JAIRO','LISETH','LISSETTE','LUCRECIA',
+  'MARGARITA','MARINA','MARISOL','MILTON','MIRIAM','MONICA','NANCY',
+  'NIDIA','NORMA','NUBIA','PIEDAD','PILAR','ROMARIO','SONIA','SUSANA',
+  'TERESA','URSULA','VIVIAN','YURI','ZAIDA','JHONY','LEIDY','NELLY',
+  'ALBA','AMPARO','BERTHA','CECILIA','ESPERANZA','FLOR','GRACIELA',
+  'INÉS','INES','LUZ','MAGDALENA','MERCEDES','NOHORA','RUBY','SOCORRO'
+]);
+
+function tercSplitName(nombre, tipoId){
+  const n=String(nombre||'').trim().toUpperCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const vacio={p1:'',p2:'',a1:'',a2:''};
+  if(!n)return vacio;
+
+  // Empresa: NIT o sufijo empresarial (word boundary)
+  const esNIT=tipoId&&/nit/i.test(String(tipoId));
+  const tieneSufijo=/\b(SAS|LTDA|LIMITADA|CORP|INC)\b/.test(n);
+  if(esNIT||tieneSufijo)return{p1:String(nombre).trim(),p2:'',a1:'',a2:''};
+
+  // Tokenizar y agrupar conectores hacia adelante
+  const CONN=new Set(['DE','DEL','LA','LAS','LOS','Y','E','I','VAN','VON']);
+  const raw=n.split(/\s+/).filter(Boolean);
+  const parts=[];
+  let i=0;
+  while(i<raw.length){
+    if(CONN.has(raw[i])){
+      // Conector forma token propio con la(s) siguiente(s) palabras
+      let grupo=raw[i]; i++;
+      while(i<raw.length&&CONN.has(raw[i])){ grupo+=' '+raw[i]; i++; }
+      if(i<raw.length){ grupo+=' '+raw[i]; i++; }
+      parts.push(grupo);
+    }else{
+      parts.push(raw[i]); i++;
+    }
+  }
+
+  const n2=parts.length;
+  if(n2===0)return vacio;
+  if(n2===1)return{p1:parts[0],p2:'',a1:'',a2:''};
+  if(n2===2)return{p1:parts[0],p2:'',a1:parts[1],a2:''};
+  if(n2===3){
+    // Token del medio: si es nombre conocido → p1,p2,a1  / si no → p1,a1,a2
+    const midEsNombre=TERC_NOMBRES_SET.has(parts[1]);
+    if(midEsNombre)return{p1:parts[0],p2:parts[1],a1:parts[2],a2:''};
+    return{p1:parts[0],p2:'',a1:parts[1],a2:parts[2]};
+  }
+  return{p1:parts[0],p2:parts[1],a1:parts[2],a2:parts.slice(3).join(' ')};
+}
+
+function tercSplitName(nombre, tipoId){
+  const n=String(nombre||'').trim().toUpperCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const vacio={p1:'',p2:'',a1:'',a2:''};
+  if(!n)return vacio;
+
+  // Empresa: NIT o sufijo empresarial (word boundary)
+  const esNIT=tipoId&&/nit/i.test(String(tipoId));
+  const tieneSufijo=/\b(SAS|LTDA|LIMITADA|CORP|INC)\b/.test(n);
+  if(esNIT||tieneSufijo)return{p1:String(nombre).trim(),p2:'',a1:'',a2:''};
+
+  // Tokenizar
+  const CONN=new Set(['DE','DEL','LA','LAS','LOS','Y','E','I','VAN','VON']);
+  const raw=n.split(/\s+/).filter(Boolean);
+
+  // Agrupar conectores con palabras adyacentes
+  const parts=[];
+  let i=0;
+  while(i<raw.length){
+    const tok=raw[i];
+    if(CONN.has(tok)&&parts.length>0&&i+1<raw.length){
+      const prev=parts.pop();
+      const nxt=raw[i+1];
+      parts.push(prev+' '+tok+' '+nxt);
+      i+=2;
+    }else{
+      parts.push(tok);
+      i++;
+    }
+  }
+
+  const n2=parts.length;
+  if(n2===0)return vacio;
+  if(n2===1)return{p1:parts[0],p2:'',a1:'',a2:''};
+  if(n2===2)return{p1:parts[0],p2:'',a1:parts[1],a2:''};
+
+  if(n2===3){
+    // Si el token del medio es un nombre conocido → p1, p2, a1
+    // Si no → p1, a1, a2 (colombiano estándar: 1 nombre + 2 apellidos)
+    const midEsNombre=TERC_NOMBRES.has(parts[1]);
+    if(midEsNombre)return{p1:parts[0],p2:parts[1],a1:parts[2],a2:''};
+    return{p1:parts[0],p2:'',a1:parts[1],a2:parts[2]};
+  }
+
+  // 4+ tokens → p1, p2, a1, a2
+  return{p1:parts[0],p2:parts[1],a1:parts[2],a2:parts.slice(3).join(' ')};
+}
+
+function tercSplitName(nombre, tipoId){
+  const n=String(nombre||'').trim().toUpperCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const vacio={p1:'',p2:'',a1:'',a2:''};
+  if(!n)return vacio;
+  // Empresa por NIT
+  const esNIT=tipoId&&/nit/i.test(String(tipoId));
+  // Empresa por sufijo (word boundary - evita falsos positivos como CIA en GARCIA)
+  const tieneSufijo=/\b(SAS|LTDA|LIMITADA|CORP|INC)\b/.test(n);
+  if(esNIT||tieneSufijo)return{p1:String(nombre).trim(),p2:'',a1:'',a2:''};
+  // Tokenizar y agrupar conectores
+  const CONN=new Set(['DE','DEL','LA','LAS','LOS','Y','E','I','VAN','VON']);
+  const raw=n.split(/\s+/).filter(Boolean);
+  const parts=[];
+  let i=0;
+  while(i<raw.length){
+    const tok=raw[i];
+    if(CONN.has(tok)&&parts.length>0&&i+1<raw.length){
+      const prev=parts.pop();
+      const nxt=raw[i+1];
+      parts.push(prev+' '+tok+' '+nxt);
+      i+=2;
+    }else{
+      parts.push(tok);
+      i++;
+    }
+  }
+  const n2=parts.length;
+  if(n2===0)return vacio;
+  if(n2===1)return{p1:parts[0],p2:'',a1:'',a2:''};
+  if(n2===2)return{p1:parts[0],p2:'',a1:parts[1],a2:''};
+  if(n2===3)return{p1:parts[0],p2:'',a1:parts[1],a2:parts[2]};
+  return{p1:parts[0],p2:parts[1],a1:parts[2],a2:parts.slice(3).join(' ')};
 }
 function tipoContrib(t,r){
   if(isNIT(t))return 'Persona Juridica';
@@ -328,7 +480,7 @@ async function startETL(){
       const email=cEmail?String(r[cEmail]||'').trim():(emailMap[id]||'');
       let p1='',p2='',a1='',a2='';
       if(juridica){p1=nombre;}
-      else{const sn=splitName(nombre);p1=sn.p1;p2=sn.p2;a1=sn.a1;a2=sn.a2;if(!a1)warns++;}
+      else{const sn=tercSplitName(nombre,tipoId);p1=sn.p1;p2=sn.p2;a1=sn.a1;a2=sn.a2;if(!a1)warns++;}
       const idNum=(!isNaN(id)&&id!=='')?Number(id):id;
       out.push({
         'Tipo Identificacion *':tipoId,
