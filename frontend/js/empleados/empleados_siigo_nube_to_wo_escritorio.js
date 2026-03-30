@@ -1,601 +1,749 @@
 // ══════════════════════════════════════════════════════════════════
-// ETL: Empleados — Siigo Nube → World Office Escritorio
-// Archivo: empleados_siigo_nube_to_wo_escritorio.js
-// Entradas: Modelo_Importacion_Empleados.xlsx + Modelo_Importacion_Contratos.xlsx
-// Salida : plantilla-nomina_woEscritorio.xlsx → hoja "Información Empleados"
+// ETL: Terceros — Siigo Nube → World Office Escritorio
+// Módulo: terceros_siigo_nube_to_wo_escritorio.js
 // ══════════════════════════════════════════════════════════════════
 
-// ── Estado ───────────────────────────────────────────────────────
-const EMP_ESC = { files:{} };
-let EMP_ESC_WB = null;
-const EMP_ESC_LOG = [];
-const EMP_ESC_EXCL = [];
-// Pending data waiting for modal confirmation
-let _empEscPending = null;
+// ── Estado ETL Escritorio ─────────────────────────────────────────
+const ESC_S = {orig:'',dest:'',mod:'',files:{}};
+let ESC_WB = null;
+const ESC_LOG = [];
+const ESC_EXCLUDED = [];
 
-// ── Columnas salida (55 cols) ─────────────────────────────────────
-const EMP_ESC_COLS = [
-  'Tipo Identificación','Identificación','Identificación Ciudad',
-  'Primer Nombre','Segundo Nombre','Primer Apellido','Segundo Apellido',
-  'Tipo Contrato','Fecha Ingreso','Area','Clase','Empresa','Cargo','Sueldo',
-  'Periodo Pago','Centro Costos','Clasificación Dian',
-  'Cesantias','IntCesantias','Prima ','Vacaciones','Ret. Fte',
-  'Fecha Nacimiento','Ciudad','Tipo Dirección','Direccion','Teléfono','E_Mail',
-  'Número hijos','Estado Civil','Declarante','Dotación',
-  'Tipo Cuenta ','Número Cuenta ','Banco Cuenta',
-  'Tipo Sena','Fecha Fin Periodo Prueba','Fecha Fin Contrato',
-  'ARL','Fecha Afil. ARL','Tarifa ARL',
-  'EPS','Fecha Afil. EPS',
-  'Pensión','Fecha Afil. AFP',
-  'Fondo Cesantias','Fecha Afil. Fondo Cesantías',
-  'Caja de Compensacion','Fecha Afil. Caja',
-  'Código Centro Costos','Libreta Militar No.','Sexo',
-  'Centro De Trabajo','Tipo Cotizante','Sub tipo Cotizante'
+// ── Ciudades WO Escritorio ────────────────────────────────────────
+const ESC_CIUDADES = ["Abejorral", "Abrego", "Abriaquí", "Acacías", "Acandí", "Acevedo", "Achí", "Agrado", "Agua De Dios", "Aguachica", "Aguada", "Aguadas", "Aguazul", "Agustín Codazzi", "Aipe", "Albán", "Albania", "Alcalá", "Aldana", "Alejandría", "Algarrobo", "Algeciras", "Almaguer", "Almeida", "Alpujarra", "Altamira", "Alto Baudo", "Altos Del Rosario", "Alvarado", "Amagá", "Amalfi", "Ambalema", "Anapoima", "Ancuyá", "Andalucía", "Andes", "Angelópolis", "Angostura", "Anolaima", "Anorí", "Anserma", "Ansermanuevo", "Anza", "Anzoátegui", "Apartadó", "Apía", "Apulo", "Aquitania", "Aracataca", "Aranzazu", "Aratoca", "Arauca", "Arauquita", "Arbeláez", "Arboleda", "Arboledas", "Arboletes", "Arcabuco", "Arenal", "Argelia", "Ariguaní", "Arjona", "Armenia", "Armero", "Arroyohondo", "Astrea", "Ataco", "Atrato", "Ayapel", "Bagadó", "Bahía Solano", "Bajo Baudó", "Balboa", "Baranoa", "Baraya", "Barbacoas", "Barbosa", "Barichara", "Barranca De Upía", "Barrancabermeja", "Barrancas", "Barranco De Loba", "Barranco Minas", "Barranquilla", "Becerril", "Belalcázar", "Belén", "Belén De Bajirá", "Belén De Los Andaquies", "Belén De Umbría", "Bello", "Belmira", "Beltrán", "Berbeo", "Betania", "Betéitiva", "Betulia", "Bituima", "Boavita", "Bochalema", "Bogota D.C.", "Bojacá", "Bojaya", "Bolívar", "Bosconia", "Boyacá", "Briceño", "Bucaramanga", "Bucarasica", "Buenaventura", "Buenavista", "Buenos Aires", "Buesaco", "Bugalagrande", "Buriticá", "Busbanzá", "Cabrera", "Cabuyaro", "Cacahual", "Cáceres", "Cachipay", "Cachirá", "Cácota", "Caicedo", "Caicedonia", "Caimito", "Cajamarca", "Cajibío", "Cajicá", "Calamar", "Calarca", "Caldas", "Caldono", "Cali", "California", "Calima", "Caloto", "Campamento", "Campo De La Cruz", "Campoalegre", "Campohermoso", "Canalete", "Candelaria", "Cantagallo", "Cañasgordas", "Caparrapí", "Capitanejo", "Caqueza", "Caracolí", "Caramanta", "Carcasí", "Carepa", "Carmen De Apicalá", "Carmen De Carupa", "Carmen Del Darien", "Carolina", "Cartagena", "Cartagena Del Chairá", "Cartago", "Caruru", "Casabianca", "Castilla La Nueva", "Caucasia", "Cepitá", "Cereté", "Cerinza", "Cerrito", "Cerro San Antonio", "Cértegui", "Chachagüí", "Chaguaní", "Chalán", "Chameza", "Chaparral", "Charalá", "Charta", "Chía", "Chibolo", "Chigorodó", "Chima", "Chimá", "Chimichagua", "Chinácota", "Chinavita", "Chinchiná", "Chinú", "Chipaque", "Chipatá", "Chiquinquirá", "Chíquiza", "Chiriguaná", "Chiscas", "Chita", "Chitagá", "Chitaraque", "Chivatá", "Chivor", "Choachí", "Chocontá", "Cicuco", "Ciénaga", "Ciénaga De Oro", "Ciénega", "Cimitarra", "Circasia", "Cisneros", "Ciudad Bolívar", "Clemencia", "Cocorná", "Coello", "Cogua", "Colombia", "Colón", "Coloso", "Cómbita", "Concepción", "Concordia", "Condoto", "Confines", "Consaca", "Contadero", "Contratación", "Convención", "Copacabana", "Coper", "Córdoba", "Corinto", "Coromoro", "Corozal", "Corrales", "Cota", "Cotorra", "Covarachía", "Coveñas", "Coyaima", "Cravo Norte", "Cuaspud", "Cubará", "Cubarral", "Cucaita", "Cucunubá", "Cúcuta", "Cucutilla", "Cuítiva", "Cumaral", "Cumaribo", "Cumbal", "Cumbitara", "Cunday", "Curillo", "Curití", "Curumaní", "Dabeiba", "Dagua", "Dibulla", "Distracción", "Dolores", "Don Matías", "Dosquebradas", "Duitama", "Durania", "Ebéjico", "El Águila", "El Bagre", "El Banco", "El Cairo", "El Calvario", "El Cantón Del San Pablo", "El Carmen", "El Carmen De Atrato", "El Carmen De Bolívar", "El Carmen De Chucurí", "El Carmen De Viboral", "El Castillo", "El Cerrito", "El Charco", "El Cocuy", "El Colegio", "El Copey", "El Doncello", "El Dorado", "El Dovio", "El Encanto", "El Espino", "El Guacamayo", "El Guamo", "El Litoral Del San Juan", "El Molino", "El Paso", "El Paujil", "El Peñol", "El Peñón", "El Piñon", "El Playón", "El Retén", "El Retorno", "El Roble", "El Rosal", "El Rosario", "El Santuario", "El Tablón De Gómez", "El Tambo", "El Tarra", "El Zulia", "Elías", "Encino", "Enciso", "Entrerrios", "Envigado", "Espinal", "Facatativá", "Falan", "Filadelfia", "Filandia", "Firavitoba", "Flandes", "Florencia", "Floresta", "Florián", "Florida", "Floridablanca", "Fomeque", "Fonseca", "Fortul", "Fosca", "Francisco Pizarro", "Fredonia", "Fresno", "Frontino", "Fuente De Oro", "Fundación", "Funes", "Funza", "Fúquene", "Fusagasugá", "Gachala", "Gachancipá", "Gachantivá", "Gachetá", "Galán", "Galapa", "Galeras", "Gama", "Gamarra", "Gambita", "Gameza", "Garagoa", "Garzón", "Génova", "Gigante", "Ginebra", "Giraldo", "Girardot", "Girardota", "Girón", "Gómez Plata", "González", "Gramalote", "Granada", "Guaca", "Guacamayas", "Guacarí", "Guachetá", "Guachucal", "Guadalajara De Buga", "Guadalupe", "Guaduas", "Guaitarilla", "Gualmatán", "Guamal", "Guamo", "Guapi", "Guapotá", "Guaranda", "Guarne", "Guasca", "Guatape", "Guataquí", "Guatavita", "Guateque", "Guática", "Guavatá", "Guayabal De Siquima", "Guayabetal", "Guayatá", "Güepsa", "Güicán", "Gutiérrez", "Hacarí", "Hatillo De Loba", "Hato", "Hato Corozal", "Hatonuevo", "Heliconia", "Herrán", "Herveo", "Hispania", "Hobo", "Honda", "Ibagué", "Icononzo", "Iles", "Imués", "Inírida", "Inzá", "Ipiales", "Iquira", "Isnos", "Istmina", "Itagui", "Ituango", "Iza", "Jambaló", "Jamundí", "Jardín", "Jenesano", "Jericó", "Jerusalén", "Jesús María", "Jordán", "Juan De Acosta", "Junín", "Juradó", "La Apartada", "La Argentina", "La Belleza", "La Calera", "La Capilla", "La Ceja", "La Celia", "La Chorrera", "La Cruz", "La Cumbre", "La Dorada", "La Esperanza", "La Estrella", "La Florida", "La Gloria", "La Guadalupe", "La Jagua De Ibirico", "La Jagua Del Pilar", "La Llanada", "La Macarena", "La Merced", "La Mesa", "La Montañita", "La Palma", "La Paz", "La Pedrera", "La Peña", "La Pintada", "La Plata", "La Playa", "La Primavera", "La Salina", "La Sierra", "La Tebaida", "La Tola", "La Unión", "La Uvita", "La Vega", "La Victoria", "La Virginia", "Labateca", "Labranzagrande", "Landázuri", "Lebríja", "Leguízamo", "Leiva", "Lejanías", "Lenguazaque", "Lérida", "Leticia", "Líbano", "Liborina", "Linares", "Lloró", "López", "Lorica", "Los Andes", "Los Córdobas", "Los Palmitos", "Los Patios", "Los Santos", "Lourdes", "Luruaco", "Macanal", "Macaravita", "Maceo", "Macheta", "Madrid", "Magangué", "Magüi", "Mahates", "Maicao", "Majagual", "Málaga", "Malambo", "Mallama", "Manatí", "Manaure", "Maní", "Manizales", "Manta", "Manzanares", "Mapiripán", "Mapiripana", "Margarita", "María La Baja", "Marinilla", "Maripí", "Mariquita", "Marmato", "Marquetalia", "Marsella", "Marulanda", "Matanza", "Medellín", "Medina", "Medio Atrato", "Medio Baudó", "Medio San Juan", "Melgar", "Mercaderes", "Mesetas", "Milán", "Miraflores", "Miranda", "Miriti - Paraná", "Mistrató", "Mitú", "Mocoa", "Mogotes", "Molagavita", "Momil", "Mompós", "Mongua", "Monguí", "Moniquirá", "Montebello", "Montecristo", "Montelíbano", "Montenegro", "Montería", "Monterrey", "Moñitos", "Morales", "Morelia", "Morichal", "Morroa", "Mosquera", "Motavita", "Murillo", "Murindó", "Mutatá", "Mutiscua", "Muzo", "Nariño", "Nátaga", "Natagaima", "Nechí", "Necoclí", "Neira", "Neiva", "Nemocón", "Nilo", "Nimaima", "Nobsa", "Nocaima", "Norcasia", "Nóvita", "Nueva Granada", "Nuevo Colón", "Nunchía", "Nuquí", "Obando", "Ocamonte", "Ocaña", "Oiba", "Oicatá", "Olaya", "Olaya Herrera", "Onzaga", "Oporapa", "Orito", "Orocué", "Ortega", "Ospina", "Otanche", "Ovejas", "Pachavita", "Pacho", "Pacoa", "Pácora", "Padilla", "Paez", "Páez", "Paicol", "Pailitas", "Paime", "Paipa", "Pajarito", "Palermo", "Palestina", "Palmar", "Palmar De Varela", "Palmas Del Socorro", "Palmira", "Palmito", "Palocabildo", "Pamplona", "Pamplonita", "Pana Pana", "Pandi", "Panqueba", "Papunaua", "Páramo", "Paratebueno", "Pasca", "Pasto", "Patía", "Pauna", "Paya", "Paz De Ariporo", "Paz De Río", "Pedraza", "Pelaya", "Pensilvania", "Peñol", "Peque", "Pereira", "Pesca", "Piamonte", "Piedecuesta", "Piedras", "Piendamó", "Pijao", "Pijiño Del Carmen", "Pinchote", "Pinillos", "Piojó", "Pisba", "Pital", "Pitalito", "Pivijay", "Planadas", "Planeta Rica", "Plato", "Policarpa", "Polonuevo", "Ponedera", "Popayán", "Pore", "Potosí", "Pradera", "Prado", "Providencia", "Pueblo Bello", "Pueblo Nuevo", "Pueblo Rico", "Pueblorrico", "Puebloviejo", "Puente Nacional", "Puerres", "Puerto Alegría", "Puerto Arica", "Puerto Asís", "Puerto Berrío", "Puerto Boyacá", "Puerto Caicedo", "Puerto Carreño", "Puerto Colombia", "Puerto Concordia", "Puerto Escondido", "Puerto Gaitán", "Puerto Guzmán", "Puerto Libertador", "Puerto Lleras", "Puerto López", "Puerto Nare", "Puerto Nariño", "Puerto Parra", "Puerto Rico", "Puerto Rondón", "Puerto Salgar", "Puerto Santander", "Puerto Tejada", "Puerto Triunfo", "Puerto Wilches", "Pulí", "Pupiales", "Puracé", "Purificación", "Purísima", "Quebradanegra", "Quetame", "Quibdó", "Quimbaya", "Quinchía", "Quípama", "Quipile", "Ragonvalia", "Ramiriquí", "Ráquira", "Recetor", "Regidor", "Remedios", "Remolino", "Repelón", "Restrepo", "Retiro", "Ricaurte", "Río De Oro", "Río Iro", "Río Quito", "Río Viejo", "Rioblanco", "Riofrío", "Riohacha", "Rionegro", "Riosucio", "Risaralda", "Rivera", "Roberto Payán", "Roldanillo", "Roncesvalles", "Rondón", "Rosas", "Rovira", "Sabana De Torres", "Sabanagrande", "Sabanalarga", "Sabanas De San Angel", "Sabaneta", "Saboyá", "Sácama", "Sáchica", "Sahagún", "Saladoblanco", "Salamina", "Salazar", "Saldaña", "Salento", "Salgar", "Samacá", "Samaná", "Samaniego", "Sampués", "San Agustín", "San Alberto", "San Andrés", "San Andrés Sotavento", "San Antero", "San Antonio", "San Antonio Del Tequendama", "San Benito", "San Benito Abad", "San Bernardo", "San Bernardo Del Viento", "San Calixto", "San Carlos", "San Carlos De Guaroa", "San Cayetano", "San Cristóbal", "San Diego", "San Eduardo", "San Estanislao", "San Felipe", "San Fernando", "San Francisco", "San Gil", "San Jacinto", "San Jacinto Del Cauca", "San Jerónimo", "San Joaquín", "San José", "San José De La Montaña", "San José De Miranda", "San José De Pare", "San José Del Fragua", "San José Del Guaviare", "San José Del Palmar", "San Juan De Arama", "San Juan De Betulia", "San Juan De Río Seco", "San Juan De Urabá", "San Juan Del Cesar", "San Juan Nepomuceno", "San Juanito", "San Lorenzo", "San Luis", "San Luis De Gaceno", "San Luis De Palenque", "San Marcos", "San Martín", "San Martín De Loba", "San Mateo", "San Miguel", "San Miguel De Sema", "San Onofre", "San Pablo", "San Pablo De Borbur", "San Pedro", "San Pedro De Cartago", "San Pedro De Uraba", "San Pelayo", "San Rafael", "San Roque", "San Sebastián", "San Sebastián De Buenavista", "San Vicente", "San Vicente De Chucurí", "San Vicente Del Caguán", "San Zenón", "Sandoná", "Santa Ana", "Santa Bárbara", "Santa Bárbara De Pinto", "Santa Catalina", "Santa Helena Del Opón", "Santa Isabel", "Santa Lucía", "Santa María", "Santa Marta", "Santa Rosa", "Santa Rosa De Cabal", "Santa Rosa De Osos", "Santa Rosa De Viterbo", "Santa Rosa Del Sur", "Santa Rosalía", "Santa Sofía", "Santacruz", "Santafé De Antioquia", "Santana", "Santander De Quilichao", "Santiago", "Santiago De Tolú", "Santo Domingo", "Santo Tomás", "Santuario", "Sapuyes", "Saravena", "Sardinata", "Sasaima", "Sativanorte", "Sativasur", "Segovia", "Sesquilé", "Sevilla", "Siachoque", "Sibaté", "Sibundoy", "Silos", "Silvania", "Silvia", "Simacota", "Simijaca", "Simití", "Sincé", "Sincelejo", "Sipí", "Sitionuevo", "Soacha", "Soatá", "Socha", "Socorro", "Socotá", "Sogamoso", "Solano", "Soledad", "Solita", "Somondoco", "Sonson", "Sopetrán", "Soplaviento", "Sopó", "Sora", "Soracá", "Sotaquirá", "Sotara", "Suaita", "Suan", "Suárez", "Suaza", "Subachoque", "Sucre", "Suesca", "Supatá", "Supía", "Suratá", "Susa", "Susacón", "Sutamarchán", "Sutatausa", "Sutatenza", "Tabio", "Tadó", "Talaigua Nuevo", "Tamalameque", "Támara", "Tame", "Támesis", "Taminango", "Tangua", "Taraira", "Tarapacá", "Tarazá", "Tarqui", "Tarso", "Tasco", "Tauramena", "Tausa", "Tello", "Tena", "Tenerife", "Tenjo", "Tenza", "Teorama", "Teruel", "Tesalia", "Tibacuy", "Tibaná", "Tibasosa", "Tibirita", "Tibú", "Tierralta", "Timaná", "Timbío", "Timbiquí", "Tinjacá", "Tipacoque", "Tiquisio", "Titiribí", "Toca", "Tocaima", "Tocancipá", "Togüí", "Toledo", "Tolú Viejo", "Tona", "Tópaga", "Topaipí", "Toribio", "Toro", "Tota", "Totoró", "Trinidad", "Trujillo", "Tubará", "Tuluá", "Tumaco", "Tunja", "Tununguá", "Túquerres", "Turbaco", "Turbaná", "Turbo", "Turmequé", "Tuta", "Tutazá", "Ubalá", "Ubaque", "Ulloa", "Umbita", "Une", "Unguía", "Unión Panamericana", "Uramita", "Uribe", "Uribia", "Urrao", "Urumita", "Usiacurí", "Útica", "Valdivia", "Valencia", "Valle De San José", "Valle De San Juan", "Valle Del Guamuez", "Valledupar", "Valparaíso", "Vegachí", "Vélez", "Venadillo", "Venecia", "Ventaquemada", "Vergara", "Versalles", "Vetas", "Vianí", "Victoria", "Vigía Del Fuerte", "Vijes", "Villa Caro", "Villa De Leyva", "Villa De San Diego De Ubate", "Villa Del Rosario", "Villa Rica", "Villagarzón", "Villagómez", "Villahermosa", "Villamaría", "Villanueva", "Villapinzón", "Villarrica", "Villavicencio", "Villavieja", "Villeta", "Viotá", "Viracachá", "Vistahermosa", "Viterbo", "Yacopí", "Yacuanquer", "Yaguará", "Yalí", "Yarumal", "Yavaraté", "Yolombó", "Yondó", "Yopal", "Yotoco", "Yumbo", "Zambrano", "Zapatoca", "Zapayán", "Zaragoza", "Zarzal", "Zetaquira", "Zipacón", "Zipaquirá", "Zona Bananera"];
+
+// ── Mapeo Tipo Identificación ─────────────────────────────────────
+const ESC_TIPO_ID_MAP = {
+  'tarjeta de identidad':'TI',
+  'registro civil':'REGISTRO CIVIL',
+  'cédula de ciudadanía':'CC',
+  'cedula de ciudadania':'CC',
+  'tarjeta de extranjería':'TE',
+  'cédula de extranjería':'Cédula de extranjería',
+  'nit':'NIT',
+  'pasaporte':'PASAPORTE',
+  'documento de identificación extranjero':'Documento de identificación extranjero',
+  'nuip':'NUIP',
+  'permiso especial de permanencia pep':'Permiso especial de permanencia',
+  'permiso protección temporal ppt':'Permiso especial de permanencia',
+  'sin identificación del exterior o para uso definido por la dian':'Sin identificación del exterior o para uso definido por la DIAN',
+  'nit de otro país / sin identificación del exterior (43 medios magnéticos)':'Documento de Identificación extranjero Persona Jurídica',
+  'salvoconducto de permanencia':'OTRO'
+};
+
+// ── Mapeo Régimen Fiscal → Propiedad Retención ────────────────────
+const ESC_REGIMEN_MAP = {
+  'responsable de iva':'Persona Natural Responsable del IVA',
+  'no responsable de iva':'Persona Natural No Responsable del IVA'
+};
+
+const ESC_NITS_EXCLUIR = new Set(["222222222","800003122","800037800","800088702","800112806","800118954","800130907","800138188","800140949","800147502","800148514","800149496","800197268","800211025","800216278","800219488","800224808","800226175","800227940","800229739","800231969","800251440","800253055","800256161","804002105","805000427","805001157","806008394","809008362","817001773","824001398","830003564","830008686","830009783","830054904","830074184","830113831","830125132","837000084","839000495","844003392","860002183","860002503","860002964","860003020","860007335","860007336","860007379","860007738","860008645","860011153","860013570","860022137","860034313","860034594","860035827","860043186","860045904","860050750","860051135","860066942","860503617","890000381","890101994","890102002","890102044","890102257","890200106","890200756","890201578","890203088","890203183","890270275","890300279","890303093","890303208","890399010","890480023","890480110","890480123","890500516","890500675","890700148","890704737","890806490","890900840","890900841","890900842","890903790","890903937","890903938","890904996","890980040","891080005","891080031","891180008","891190047","891200337","891280008","891480000","891500182","891500319","891600091","891780093","891800213","891800330","891856000","892000146","892115006","892200015","892399989","892400320","899999001","899999034","899999061","899999063","899999107","899999284","899999734","900156264","900200960","900226715","900298372","900336004","900406150","900604350","900914254","900935126","901037916","901093846","901469580","901543761"]);
+
+// ── Columnas salida (plantilla WO Escritorio) ─────────────────────
+const ESC_COLS = [
+  'Tipo Identificación','No. Identificación','Ciudad Identificación',
+  '1er. Nombre o Razón Social','2do. Nombre','1re. Apellido','2do.Apellido',
+  'Propiedad Activa','Activo','Propiedad Retención','Fecha Creación',
+  'Plazo','Clasificación Dian','Actividad Económica','Matricula',
+  'Tipos_Responsabilidades','Aplica ReteIca','% Ica','Maneja Cupo Crédito',
+  'Cupo Crédito','Código','Fecha Aniversario','Forma de Pago','Lista Precios',
+  'Nota','% Descuento','Vendedor','Clasificación Uno','Clasificación Dos',
+  'Clasificación Tres','Zona Uno','Zona Dos',
+  'Personalizado 1','Personalizado 2','Personalizado 3','Personalizado 4',
+  'Personalizado 5','Personalizado 6','Personalizado 7','Personalizado 8',
+  'Personalizado 9','Personalizado 10','Personalizado 11','Personalizado 12',
+  'Personalizado 13','Personalizado 14','Personalizado 15',
+  'Tipo Dirección','Ciudad Dirección','Dirección','Dirección Principal',
+  'Teléfonos','Código Postal','Fax','Movil 1','Movil 2',
+  'E_Mail','E_Mail 2','E_Mail 3','Página Web','Observaciones','Sucursal'
 ];
 
-// ── Mapeos ────────────────────────────────────────────────────────
-const EMP_ESC_TIPO_ID = {
-  'cédula de ciudadanía':'CC','cedula de ciudadania':'CC',
-  'tarjeta de identidad':'TI','cédula de extranjería':'Cédula de extranjería',
-  'cedula de extranjeria':'Cédula de extranjería','pasaporte':'PASAPORTE',
-  'nit':'NIT','registro civil':'REGISTRO CIVIL'
-};
-const EMP_ESC_CONTRATO = {
-  'indefinido':'Indefinido','fijo':'Fijo',
-  'obra o labor':'Labor Contratada','aprendizaje':'Definido menos de un año'
-};
-const EMP_ESC_AREA = {
-  'administración':'Administrativa','administracion':'Administrativa',
-  'producción':'Produccion','produccion':'Produccion','ventas':'Ventas'
-};
-const EMP_ESC_TIPO_CUENTA = { 'ahorros':'Ahorros','corriente':'Corriente','no aplica':'' };
-const EMP_ESC_BANCO = {
-  'bancolombia s.a.':'BANCOLOMBIA','banco de bogotá':'BANCO DE BOGOTÁ',
-  'banco av villas':'BANCO AV VILLAS','banco agrario de colombia s.a.':'BANCO AGRARIO DE COLOMBIA',
-  'banco falabella s.a.':'BANCO FALABELLA','banco caja social - bcsc s.a.':'BANCO CAJA SOCIAL BCSC',
-  'banco de occidente':'BANCO DE OCCIDENTE','nequi':'BANCOLOMBIA',
-  'daviplata':'BANCO DAVIVIENDA','bancamia':'BANCOLOMBIA'
-};
-const EMP_ESC_ARL = {
-  'alfa':'ARP ALFA','colmena':'COLMENA RIESGOS PROFESIONALES',
-  'colpatria arp':'ARL SEGUROS DE VIDA COLPATRIA SA',
-  'la equidad seguros':'LA EQUIDAD SEGUROS DE VIDA',
-  'liberty':'LIBERTY SEGUROS DE VIDA',
-  'mapfre colombia vida seguros s.a.':'MAPFRE COLOMBIA VIDA SEGUROS SA',
-  'positiva compañía de seguros':'POSITIVA COMPAÑÍA DE SEGUROS',
-  'seguros bolívar':'COMPAÑÍA DE SEGUROS BOLIVAR SA',
-  'seguros de riesgos laborales suramericana s.a.':'ARL SURA',
-  'seguros de vida aurora':'SEGUROS DE VIDA AURORA',
-  'seguros de vida suramericana':'ARL SURA'
-};
-const EMP_ESC_EPS = {
-  'anas wayuu':'ANAS WAYUU EPSI','ars convida':'CONVIDA','asmet salud':'ASMET  SALUD',
-  'capital salud eps':'CAPITAL SALUD EPS-S','capresoca':'CAPRESOCA EPS',
-  'comfacor':'COMFACOR EPS S','comfamiliar chocó':'COMFACHOCO EPS S',
-  'comfamiliar huila':'COMFAMILIAR HUILA EPS - CCF','comfenalco valle':'COMFENALCO VALLE DE LA GENTE Y EPS',
-  'compensar':'COMPENSAR EPS','coomeva':'COOMEVA EPS','coosalud':'COOSALUD EPS-S',
-  'cruz blanca eps':'CRUZ BLANCA EPS','eps famisanar':'FAMISANAR EPS CAFAM - COLSUBSIDIO',
-  'eps sura':'SURA','nueva eps':'NUEVA EPS','salud total eps':'SALUD TOTAL EPS',
-  'saludvida':'SALUD VIDA EPS','sanitas':'SANITAS EPS','aliansalud':'ALIANSALUD EPS'
-};
-const EMP_ESC_PENSION = {
-  'colfondos':'COLFONDOS S.A. AFPC','colpensiones':'COLPENSIONES',
-  'old mutual':'OLD MUTUAL PENSIONES Y CESANTÍAS S.A.',
-  'pensiones de antioquia':'PENSIONES DE ANTIOQUIA',
-  'porvenir s.a':'PORVENIR S.A. AFPC','protección s.a':'PROTECCIÓN S.A. AFPC'
-};
-const EMP_ESC_CAJA = {
-  'cafam':'CAFAM','cafasur':'CAFASUR','colsubsidio':'CAJA COLOMBIANA DE SUBSIDIO FAMILIAR COLSUBSIDIO',
-  'comfama':'CAJA DE COMPENSACION FAMILIAR DE ANTIOQUIA COMFAMA',
-  'comfamiliar risaralda':'COMFAMILIAR RISARALDA','comfandi':'COMFANDI',
-  'comfenalco':'COMFENALCO ANTIOQUIA','compensar':'COMPENSAR EPS'
-};
-const EMP_ESC_TIPO_COT = {
-  'dependiente - contrato laboral':'Dependiente','independiente':'Independiente',
-  'servicio doméstico':'Servicio Domestico','aprendiz sena':'Aprendices del SENA en etapa lectiva'
-};
-const EMP_ESC_SUB_COT = {
-  'sin subtipo':'Ninguno',
-  'cotizante con requisitos cumplidos para pensión':'Cotizante con requisitos cumplidos para pension'
-};
-
 // ── Helpers ───────────────────────────────────────────────────────
-function empEscMap(val, map, def=''){
-  const k=String(val||'').toLowerCase().trim();
-  if(!k) return def;
-  if(map[k]!==undefined) return map[k];
-  // partial match
-  for(const mk of Object.keys(map)){
-    if(k.includes(mk)||mk.includes(k)) return map[mk];
-  }
-  return String(val||'')||def;
+function escNormId(x){
+  const s=String(x??'').replace(/[,\s]/g,'').trim();
+  if(!s||s==='nan'||s==='undefined')return '';
+  return s.replace(/[^0-9A-Za-z\-]/g,'');
 }
-function empEscFecha(val, fmt='dd/MM/yyyy'){
-  if(!val) return '';
-  const s=String(val).trim().substring(0,10);
-  const fmts=[/^(\d{4})-(\d{2})-(\d{2})$/,/^(\d{2})\/(\d{2})\/(\d{4})$/];
-  const m1=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if(m1){
-    if(fmt==='dd/MM/yyyy') return `${m1[3]}/${m1[2]}/${m1[1]}`;
-    return s.substring(0,10);
+function escMapTipoId(raw, idNum){
+  const k=String(raw||'').toLowerCase().trim();
+  if(!k){
+    // Inferir por longitud del número: NIT tiene 9 dígitos, CC entre 6-10
+    const n=String(idNum||'').replace(/\D/g,'');
+    if(n.length===9)return 'NIT';
+    return 'CC';
   }
-  return s;
+  return ESC_TIPO_ID_MAP[k]||String(raw||'');
 }
-function empEscNormCiudad(raw){
-  // Use escritorio cities list if available
-  if(!raw) return 'Bogota D.C.';
+function escIsNIT(t){return String(t||'').toLowerCase().includes('nit');}
+// NIT empresa: 9 dígitos que inicia en 8 o 9
+function escNitEsEmpresa(idNum){
+  const n=String(idNum||'').replace(/[^0-9]/g,'');
+  return n.length===9 && (n[0]==='8'||n[0]==='9');
+}
+function escLimpiarParte(p){
+  // Eliminar si es solo un caracter especial, numero o simbolo
+  if(!p) return '';
+  // Si tiene 1 caracter y no es letra: descartar
+  if(p.length===1&&!/[A-Za-zÁÉÍÓÚÑáéíóúñ]/i.test(p)) return '';
+  // Si termina en caracter especial/numero, quitarlo
+  return p.replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ]+$/, '').trim();
+}
+// ── Separación de nombres (dev.zip AINameSplitter) ───────────────
+// Reglas:
+//   NIT/empresa (SAS,LTDA,CORP,INC) → razón social completa en p1
+//   Conectores (DE,DEL,LA,LAS,LOS,Y,E,I) forman token propio con la palabra siguiente
+//   1 token  → p1
+//   2 tokens → p1, a1
+//   3 tokens → si token[1] es nombre conocido → p1,p2,a1 / si no → p1,a1,a2
+//   4+ tokens → p1, p2, a1, a2
+
+const TERC_NOMBRES_SET = new Set([
+  'ALEXANDER','ALEJANDRO','ALEXIS','ANDRES','ANGEL','ANTONIO','ARTURO',
+  'CAMILO','CARLOS','CRISTIAN','CRISTINA','DANIEL','DAVID','DIEGO',
+  'EDGAR','EDUARDO','ELENA','ELIANA','EMILIO','FABIAN','FELIPE','FERNANDO',
+  'FRANCISCO','FREDDY','GABRIEL','GERMAN','GLORIA','GUSTAVO','HAROLD',
+  'HECTOR','HERNAN','HUGO','IVAN','JAVIER','JEFFERSON','JENNIFER','JESSICA',
+  'JHON','JORGE','JOSE','JUAN','JULIAN','JULIO','KAREN','LAURA','LEIDY',
+  'LEONARDO','LILIANA','LINA','LUIS','LUZ','MANUEL','MARCELA','MARIA',
+  'MARIO','MARTHA','MAURICIO','MIGUEL','NATALIA','NICOLAS','OSCAR','PABLO',
+  'PAOLA','PATRICIA','PEDRO','RAFAEL','RAUL','RICARDO','ROBERTO','RODRIGO',
+  'ROSA','RUBEN','SAMUEL','SANDRA','SANTIAGO','SERGIO','SILVIA','SOFIA',
+  'STEPHANIE','TATIANA','VALENTINA','VICTOR','WILLIAM','WILSON','XIOMARA',
+  'YESENIA','YOLANDA','ZULMA','ALBA','BEATRIZ','BRAYAN','BRYAN','CAROLINA',
+  'CESAR','CLAUDIA','DIANA','DUVAN','ELISA','FELIX','GIOVANNY',
+  'ISABELLA','JACKELINE','JAIME','JENNY','JHONATAN','JOHANA','JONATHAN',
+  'KATHERINE','KELLY','LEANDRO','LORENA','LUISA','MANUELA','MARIANA',
+  'MELISSA','MICHAEL','MILLER','NELSON','OLGA','OMAR','ORLANDO',
+  'RUBIELA','SEBASTIAN','VANESSA','VERONICA','VIVIANA','YAMILE',
+  'YEISON','YENNY','ASTRID','BLANCA','CONSUELO','DARIO','ELIZABETH',
+  'ERNESTO','ESPERANZA','ESTEBAN','EUGENIO','FRANCO','FREDY','GIOVANNI',
+  'GLADYS','GONZALO','IGNACIO','JAIRO','LISETH','LISSETTE','LUCRECIA',
+  'MARGARITA','MARINA','MARISOL','MILTON','MIRIAM','MONICA','NANCY',
+  'NIDIA','NORMA','NUBIA','PIEDAD','PILAR','ROMARIO','SONIA','SUSANA',
+  'TERESA','URSULA','VIVIAN','YURI','ZAIDA','JHONY','LEIDY','NELLY',
+  'ALBA','AMPARO','BERTHA','CECILIA','ESPERANZA','FLOR','GRACIELA',
+  'INÉS','INES','LUZ','MAGDALENA','MERCEDES','NOHORA','RUBY','SOCORRO'
+,
+  'MILENA','ADRIANA','ALEJANDRA','ALICIA','AMPARO','BERTHA','BIBIANA','BRIGITTE','CONSUELO','DEISY','DOLORES','EMILIA','FABIOLA','FLOR','FRANCY','GINA','HEIDY','HELENA','INGRID','IRENE','ISABEL','JANA','JAZMIN','JOHANA','JOHANNA','JOSEFINA','JUANA','LEILA','LEONOR','LINEY','LORENA','LORENZA','LUCIA','LUISA','LYDA','MABEL','MAGNOLIA','MAIERLY','MANUELA','MARGARITA','MARIANA','MARIELA','MARLENY','MARLEN','MAYERLY','MELISSA','MIREYA','NATALY','NELLY','NIDIA','NUBIA','OFELIA','OLGA','ORIANNA','ORFA','PAULA','PILAR','PIEDAD','ROBERTA','ROSALBA','ROSANA','ROSARIO','ROSAURA','RUBY','RUTH','SARAH','SILVIA','SOLEDAD','SONIA','STEFANIA','SUSANA','TERESA','URSULA','VANESSA','VERONICA','VIVIAN','WENDY','XIOMARA','YAMILE','YENNY','YESENIA','YOLANDA','YULIANA','YURANI','YURI','ZAIDA','ZULMA','VIOLETA','YARIT','LISETH','ANN','DAYANA','DIANA','DIXIE','FLAVIA','HELLEN','ILSE','LISSETH','LILIANA','MARCELA','MARINELA','MARISOL','MIRIAM','MONICA','NANCY','NORMA','RUBIELA','ROSEMARY','SOCORRA'
+,
+  'ABEL','AGUSTINA','ALBERTO','ALEXANDRA','ALFONSO','AMANDA','ANDREA','ANGEE','ANGELA','ANGELICA','ANNIE','ARMANDO','AUGUSTO','AURELIO','BRAIAN','BRANDON','BRIALLAN','CAMILA','CARMEN','CAROL','CAROLYN','CATALINA','CRISTIN','DANIELA','DANILO','DANNA','DIDIER','DUVER','EDISON','EFREN','ELVIRA','ENRIQUE','ERICK','ERIKA','EUGENIA','EZEQUIEL','FERNANDA','FRANKLIN','GABRIELA','GERSON','GILBERTO','GINNA','GINO','HENRY','HERNANDO','HUBER','HUMBERTO','IVETH','JACKSON','JADER','JAIR','JARY','JEAN','JEFERSON','JEIMI','JEIMY','JEISON','JEISSON','JESUS','JHAN','JHOAN','JHONNY','JOAN','JOEL','JOHAN','JOHN','JONATAN','JORDAN','JULY','KELLIN','KEVIN','LEIDER','LUCAS','LUNA','MAICOL','MARBY','MARCO','MARLON','MARTIN','MATEO','MIRLEN','MISAEL','NELSI','NICK','NICOLE','NIVIA','OCTAVIO','RICHARD','ROCIO','ROGER','ROLANDO','SILENA','STEVEN','STIVEN','TANIA','VALERIA','VICENTE','VICTORIA','XIMENA','YAIR','YANETH','YEFREN','YEIMI','YENI','YESID','YESSICA','YINNA','YISETTE','YUBER','YURANY'
+]);
+
+function tercSplitName(nombre, tipoId){
+  const n=String(nombre||'').trim().toUpperCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const vacio={p1:'',p2:'',a1:'',a2:''};
+  if(!n)return vacio;
+
+  // Empresa: NIT o sufijo empresarial (word boundary)
+  const esNIT=tipoId&&/nit/i.test(String(tipoId));
+  const tieneSufijo=/\b(SAS|LTDA|LIMITADA|CORP|INC)\b/.test(n);
+  if(esNIT||tieneSufijo)return{p1:String(nombre).trim(),p2:'',a1:'',a2:''};
+
+  // Tokenizar y agrupar conectores hacia adelante
+  const CONN=new Set(['DE','DEL','LA','LAS','LOS','Y','E','I','VAN','VON']);
+  const raw=n.split(/\s+/).filter(Boolean);
+  const parts=[];
+  let i=0;
+  while(i<raw.length){
+    if(CONN.has(raw[i])){
+      // Conector forma token propio con la(s) siguiente(s) palabras
+      let grupo=raw[i]; i++;
+      while(i<raw.length&&CONN.has(raw[i])){ grupo+=' '+raw[i]; i++; }
+      if(i<raw.length){ grupo+=' '+raw[i]; i++; }
+      parts.push(grupo);
+    }else{
+      parts.push(raw[i]); i++;
+    }
+  }
+
+  const n2=parts.length;
+  if(n2===0)return vacio;
+  if(n2===1)return{p1:parts[0],p2:'',a1:'',a2:''};
+  if(n2===2)return{p1:parts[0],p2:'',a1:parts[1],a2:''};
+  if(n2===3){
+    // Token del medio: si es nombre conocido → p1,p2,a1  / si no → p1,a1,a2
+    const midEsNombre=TERC_NOMBRES_SET.has(parts[1]);
+    if(midEsNombre)return{p1:parts[0],p2:parts[1],a1:parts[2],a2:''};
+    return{p1:parts[0],p2:'',a1:parts[1],a2:parts[2]};
+  }
+  return{p1:parts[0],p2:parts[1],a1:parts[2],a2:parts.slice(3).join(' ')};
+}
+
+function tercSplitName(nombre, tipoId){
+  const n=String(nombre||'').trim().toUpperCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const vacio={p1:'',p2:'',a1:'',a2:''};
+  if(!n)return vacio;
+
+  // Empresa: NIT o sufijo empresarial (word boundary)
+  const esNIT=tipoId&&/nit/i.test(String(tipoId));
+  const tieneSufijo=/\b(SAS|LTDA|LIMITADA|CORP|INC)\b/.test(n);
+  if(esNIT||tieneSufijo)return{p1:String(nombre).trim(),p2:'',a1:'',a2:''};
+
+  // Tokenizar
+  const CONN=new Set(['DE','DEL','LA','LAS','LOS','Y','E','I','VAN','VON']);
+  const raw=n.split(/\s+/).filter(Boolean);
+
+  // Agrupar conectores con palabras adyacentes
+  const parts=[];
+  let i=0;
+  while(i<raw.length){
+    const tok=raw[i];
+    if(CONN.has(tok)&&parts.length>0&&i+1<raw.length){
+      const prev=parts.pop();
+      const nxt=raw[i+1];
+      parts.push(prev+' '+tok+' '+nxt);
+      i+=2;
+    }else{
+      parts.push(tok);
+      i++;
+    }
+  }
+
+  const n2=parts.length;
+  if(n2===0)return vacio;
+  if(n2===1)return{p1:parts[0],p2:'',a1:'',a2:''};
+  if(n2===2)return{p1:parts[0],p2:'',a1:parts[1],a2:''};
+
+  if(n2===3){
+    // Si el token del medio es un nombre conocido → p1, p2, a1
+    // Si no → p1, a1, a2 (colombiano estándar: 1 nombre + 2 apellidos)
+    const midEsNombre=TERC_NOMBRES.has(parts[1]);
+    if(midEsNombre)return{p1:parts[0],p2:parts[1],a1:parts[2],a2:''};
+    return{p1:parts[0],p2:'',a1:parts[1],a2:parts[2]};
+  }
+
+  // 4+ tokens → p1, p2, a1, a2
+  return{p1:parts[0],p2:parts[1],a1:parts[2],a2:parts.slice(3).join(' ')};
+}
+
+function tercSplitName(nombre, tipoId){
+  const n=String(nombre||'').trim().toUpperCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const vacio={p1:'',p2:'',a1:'',a2:''};
+  if(!n)return vacio;
+  // Empresa por NIT
+  const esNIT=tipoId&&/nit/i.test(String(tipoId));
+  // Empresa por sufijo (word boundary - evita falsos positivos como CIA en GARCIA)
+  const tieneSufijo=/\b(SAS|LTDA|LIMITADA|CORP|INC)\b/.test(n);
+  if(esNIT||tieneSufijo)return{p1:String(nombre).trim(),p2:'',a1:'',a2:''};
+  // Tokenizar y agrupar conectores
+  const CONN=new Set(['DE','DEL','LA','LAS','LOS','Y','E','I','VAN','VON']);
+  const raw=n.split(/\s+/).filter(Boolean);
+  const parts=[];
+  let i=0;
+  while(i<raw.length){
+    const tok=raw[i];
+    if(CONN.has(tok)&&parts.length>0&&i+1<raw.length){
+      const prev=parts.pop();
+      const nxt=raw[i+1];
+      parts.push(prev+' '+tok+' '+nxt);
+      i+=2;
+    }else{
+      parts.push(tok);
+      i++;
+    }
+  }
+  const n2=parts.length;
+  if(n2===0)return vacio;
+  if(n2===1)return{p1:parts[0],p2:'',a1:'',a2:''};
+  if(n2===2)return{p1:parts[0],p2:'',a1:parts[1],a2:''};
+  if(n2===3)return{p1:parts[0],p2:'',a1:parts[1],a2:parts[2]};
+  return{p1:parts[0],p2:parts[1],a1:parts[2],a2:parts.slice(3).join(' ')};
+}
+function escNormCiudad(raw){
+  if(!raw)return 'Bogota D.C.';
   const s=String(raw).trim();
-  if(typeof ESC_CIUDADES !== 'undefined'){
-    const ex=ESC_CIUDADES.find(c=>c.toLowerCase()===s.toLowerCase());
-    if(ex) return ex;
-    const st=ESC_CIUDADES.find(c=>c.toLowerCase().startsWith(s.toLowerCase().substring(0,5)));
-    if(st) return st;
-  }
-  return s;
+  // exact match
+  const exact=ESC_CIUDADES.find(c=>c.toLowerCase()===s.toLowerCase());
+  if(exact)return exact;
+  // starts with
+  const starts=ESC_CIUDADES.find(c=>c.toLowerCase().startsWith(s.toLowerCase().substring(0,5)));
+  if(starts)return starts;
+  // contains
+  const contains=ESC_CIUDADES.find(c=>c.toLowerCase().includes(s.toLowerCase().substring(0,5)));
+  if(contains)return contains;
+  return 'Bogota D.C.';
 }
-function empLog(msg,lvl='i',fase=''){
+function escNormTel(x){
+  if(!x)return '6050000000';
+  const d=String(x).replace(/\D/g,'');
+  return d||'6050000000';
+}
+function escNormAddr(x){
+  if(!x)return 'DIRECCION NO INFORMADA';
+  let s=String(x).toUpperCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[#°/.,\-()"']/g,' ')
+    .replace(/\s+/g,' ').trim();
+  return s||'DIRECCION NO INFORMADA';
+}
+function escMapRegimen(regimen, tipoId, idNum){
+  const esNIT=escIsNIT(tipoId)&&escNitEsEmpresa(idNum);
+  if(esNIT)return 'Persona Juridica';
+  const k=String(regimen||'').toLowerCase().trim();
+  return ESC_REGIMEN_MAP[k]||'Persona Juridica';
+}
+function escMapActivo(estado){
+  const s=String(estado||'').toLowerCase().trim();
+  if(s==='activo'||s==='active'||s==='1'||s==='true')return -1;
+  if(s==='inactivo'||s==='inactive'||s==='0'||s==='false')return 0;
+  return -1;
+}
+function escFechaHoy(){
+  const d=new Date();
+  const dd=String(d.getDate()).padStart(2,'0');
+  const mm=String(d.getMonth()+1).padStart(2,'0');
+  const yyyy=d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+}
+function escLog(msg,lvl='i',fase=''){
   const ts=new Date().toISOString();
-  EMP_ESC_LOG.push({ts,fase,lvl,msg});
-  const panel=document.getElementById('emp-logp');
+  ESC_LOG.push({ts,fase,lvl,msg});
+  const panel=document.getElementById('logp');
   if(!panel)return;
   const now=new Date().toLocaleTimeString('es-CO',{hour12:false});
   const css={i:'li',w:'lw',o:'lo',e:'le-e'}[lvl]||'li';
   panel.innerHTML+=`<div class="le"><span class="lt">${now}</span><span class="${css}">${msg}</span></div>`;
   panel.scrollTop=panel.scrollHeight;
 }
-function empEscSleep(ms){return new Promise(r=>setTimeout(r,ms));}
+function escSleep(ms){return new Promise(r=>setTimeout(r,ms));}
 
-// ── Leer Excel genérico ───────────────────────────────────────────
-async function empEscReadXlsx(file, headerRowHint){
+// setStep/setPStep/setPct defined in terceros_siigo_nube_to_wo_cloud.js
+
+// ── File input ────────────────────────────────────────────────────
+function escOnFile(input,slotId,nameId,key){
+  const f=input.files[0];if(!f)return;
+  const slot=document.getElementById(slotId);
+  const nm=document.getElementById(nameId);
+  if(slot)slot.className='fslot ok';
+  if(nm)nm.textContent=f.name;
+  ESC_S.files[key]=f;
+}
+function escGoStart(){
+  setStep(2);
+  const el=document.getElementById('esc-fn');
+  if(el)el.textContent='';
+}
+function escGoBack(){setStep(1);}
+function escReset(){
+  ESC_S.files={};ESC_LOG.length=0;ESC_EXCLUDED.length=0;ESC_WB=null;
+  resetAll();
+  return;
+
+  setStep(1);
+}
+
+// ── Leer maestro ──────────────────────────────────────────────────
+async function escReadMaestro(file){
   return new Promise((resolve,reject)=>{
     const reader=new FileReader();
     reader.onload=e=>{
       try{
-        const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellText:true,raw:false});
+        const data=new Uint8Array(e.target.result);
+        const wb=XLSX.read(data,{type:'array',sheetStubs:true,cellText:true,raw:false});
         const ws=wb.Sheets[wb.SheetNames[0]];
-        const all=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
-        // Auto-detect header row
-        let hdrIdx=headerRowHint||0;
-        for(let i=0;i<Math.min(all.length,5);i++){
-          if(all[i].some(v=>String(v).length>5&&!/^\d+$/.test(String(v)))){
-            hdrIdx=i; break;
+        // Compute real range
+        let maxR=0,maxC=0;
+        Object.keys(ws).forEach(k=>{
+          if(k[0]==='!')return;
+          const m=k.match(/^([A-Z]+)(\d+)$/);
+          if(!m)return;
+          let c=0;for(let i=0;i<m[1].length;i++)c=c*26+m[1].charCodeAt(i)-64;
+          maxR=Math.max(maxR,parseInt(m[2]));
+          maxC=Math.max(maxC,c);
+        });
+        ws['!ref']=`A1:${XLSX.utils.encode_col(maxC-1)}${maxR}`;
+        // Find header row (row with 'Identificación' or similar)
+        let headerRow=7;
+        for(let r=1;r<=15;r++){
+          const cell=ws[XLSX.utils.encode_cell({r:r-1,c:1})];
+          if(cell&&String(cell.v||'').toLowerCase().includes('identificaci')){
+            headerRow=r;break;
           }
         }
-        const hdrs=all[hdrIdx].map(h=>String(h||'').trim());
-        const rows=all.slice(hdrIdx+1).filter(r=>r.some(v=>v!==''&&v!==null));
-        resolve({hdrs,rows});
+        const rows=XLSX.utils.sheet_to_json(ws,{header:1,range:headerRow-1,defval:''});
+        const hdrs=rows[0].map(h=>String(h||'').trim());
+        const data_rows=rows.slice(1).filter(r=>r.some(v=>v!==''&&v!==null&&v!==undefined));
+        resolve({hdrs,rows:data_rows});
       }catch(err){reject(err);}
     };
     reader.readAsArrayBuffer(file);
   });
 }
 
-// ── ETL Principal Escritorio ──────────────────────────────────────
-async function startEmpEscETL(){
-  const empFile = S.files && S.files['emp-maestro'] ? S.files['emp-maestro'] : null;
-  const ctrFile = S.files && S.files['emp-contratos'] ? S.files['emp-contratos'] : null;
-  if(!empFile){ alert('Carga el archivo Modelo_Importacion_Empleados.xlsx'); return; }
-  if(!ctrFile){ alert('Carga el archivo Modelo_Importacion_Contratos.xlsx'); return; }
 
-  empSetStep(3);
-  EMP_ESC_LOG.length=0; EMP_ESC_EXCL.length=0;
-  const panel=document.getElementById('emp-logp');
-  if(panel) panel.innerHTML='';
-  empSetPStep(0); empSetPct(0,'Iniciando...');
+// ── Leer archivo Empleados ────────────────────────────────────────
+async function escReadEmpleados(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=e=>{
+      try{
+        const data=new Uint8Array(e.target.result);
+        const wb=XLSX.read(data,{type:'array',cellText:true,raw:false});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+
+        // Validar: buscar en fila 2 (índice 1) la columna "Número de documento (Obligatorio)"
+        const row2 = rows[1] || [];
+        const tieneColumnaId = row2.some(v=>String(v).toLowerCase().includes('número de documento')||
+                                            String(v).toLowerCase().includes('numero de documento'));
+        if(!tieneColumnaId){
+          // Archivo no tiene la estructura esperada — ignorar
+          resolve({ids:new Set(),nombres:{},valido:false});
+          return;
+        }
+
+        // Buscar fila de encabezado: la que contenga "Primer nombre (Obligatorio)"
+        let hdrIdx=-1;
+        for(let i=0;i<rows.length;i++){
+          if(rows[i].some(v=>String(v).toLowerCase().includes('primer nombre'))){
+            hdrIdx=i; break;
+          }
+        }
+        if(hdrIdx<0){resolve({ids:new Set(),nombres:{},valido:false});return;}
+
+        const hdrs=rows[hdrIdx].map(h=>String(h||'').trim());
+        const idCol=hdrs.findIndex(h=>/n[uú]mero de documento/i.test(h));
+        const nameCol=hdrs.findIndex(h=>/primer nombre/i.test(h));
+        const ap1Col=hdrs.findIndex(h=>/primer apellido/i.test(h));
+
+        const ids=new Set();
+        const nombres={};
+        for(let i=hdrIdx+1;i<rows.length;i++){
+          const id=String(rows[i][idCol]||'').replace(/[^0-9A-Za-z]/g,'').trim();
+          if(!id)continue;
+          ids.add(id);
+          const n1=String(rows[i][nameCol]||'').trim();
+          const a1=ap1Col>=0?String(rows[i][ap1Col]||'').trim():'';
+          nombres[id]=[n1,a1].filter(Boolean).join(' ')||id;
+        }
+        resolve({ids,nombres,valido:true});
+      }catch(err){reject(err);}
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// ── ETL Principal ─────────────────────────────────────────────────
+async function startEscETL(){
+  // Maestro comes from shared S.files set by onFile()
+  const maestroFile = S.files && S.files['maestro'] ? S.files['maestro'] : ESC_S.files['maestro'];
+  if(!maestroFile){
+    alert('Carga el archivo maestro Búsqueda de terceros.xlsx');return;
+  }
+  setStep(3);
+  ESC_LOG.length=0;ESC_EXCLUDED.length=0;
+  const panel=document.getElementById('logp');
+  if(panel)panel.innerHTML='';
+  setPStep(0);setPct(0,'Iniciando...');
   const t0=Date.now();
 
   try{
     // ── Lectura ──────────────────────────────────────────────────
-    empLog('📂 Leyendo archivos...','i','Lectura');
-    empSetPStep(1); empSetPct(10,'Leyendo empleados...');
-    await empEscSleep(30);
+    escLog('📂 Leyendo archivos...','i','Lectura');
+    setPStep(1);setPct(10,'Leyendo maestro...');
+    await escSleep(30);
 
-    const emp = await empEscReadXlsx(empFile, 1);
-    empLog(`   Empleados: ${emp.rows.length} registros`,'i','Lectura');
+    const maestro=await escReadMaestro(maestroFile);
+    escLog(`   Maestro: ${maestro.rows.length} registros`,'i','Lectura');
 
-    empSetPct(20,'Leyendo contratos...');
-    const ctr = await empEscReadXlsx(ctrFile, 1);
-    empLog(`   Contratos: ${ctr.rows.length} registros`,'i','Lectura');
+    const emailMapC={},emailMapP={};
 
-    // ── Índices columnas empleados ────────────────────────────────
-    const EH = emp.hdrs;
-    const eN1  = EH.findIndex(h=>/primer nombre/i.test(h));
-    const eN2  = EH.findIndex(h=>/segundo nombre/i.test(h));
-    const eA1  = EH.findIndex(h=>/primer apellido/i.test(h));
-    const eA2  = EH.findIndex(h=>/segundo apellido/i.test(h));
-    const eTI  = EH.findIndex(h=>/tipo de documento/i.test(h));
-    const eID  = EH.findIndex(h=>/n[uú]mero de documento/i.test(h));
-    const eEm  = EH.findIndex(h=>/correo electr/i.test(h));
-    const eTel = EH.findIndex(h=>/n[uú]mero de celular|n[uú]mero de tel/i.test(h));
-    const eCiu = EH.findIndex(h=>/ciudad de residencia/i.test(h));
-    const eDir = EH.findIndex(h=>/direcci[oó]n de residencia/i.test(h));
-    const ePago= EH.findIndex(h=>/m[eé]todo de pago/i.test(h));
-    const eBanco=EH.findIndex(h=>/entidad bancaria/i.test(h));
-    const eTCta= EH.findIndex(h=>/tipo de cuenta/i.test(h));
-    const eNCta= EH.findIndex(h=>/n[uú]mero de cuenta/i.test(h));
-    const eCiuOf=EH.findIndex(h=>/ciudad de oficina/i.test(h));
-    const eDirOf=EH.findIndex(h=>/direcci[oó]n de oficina/i.test(h));
-
-    // ── Índices columnas contratos ────────────────────────────────
-    const CH = ctr.hdrs;
-    const cNom = CH.findIndex(h=>/nombre del empleado/i.test(h));
-    const cID  = CH.findIndex(h=>/n[uú]mero de identificaci/i.test(h));
-    const cTC  = CH.findIndex(h=>/tipo de contrato/i.test(h));
-    const cFI  = CH.findIndex(h=>/fecha inicio de contrato/i.test(h));
-    const cFF  = CH.findIndex(h=>/fecha fin de contrato/i.test(h));
-    const cSuel= CH.findIndex(h=>/sueldo/i.test(h));
-    const cGN  = CH.findIndex(h=>/grupo de n[oó]mina/i.test(h));
-    const cCarg= CH.findIndex(h=>/cargo/i.test(h));
-    const cCC  = CH.findIndex(h=>/centro de costo/i.test(h));
-    const cTCot= CH.findIndex(h=>/tipo de cotizante/i.test(h));
-    const cSTCot=CH.findIndex(h=>/subtipo de cotizante/i.test(h));
-    const cEPS = CH.findIndex(h=>/fondo de salud/i.test(h));
-    const cPen = CH.findIndex(h=>/fondo de pensi[oó]n/i.test(h));
-    const cARL = CH.findIndex(h=>/fondo arl/i.test(h));
-    const cRiesgo=CH.findIndex(h=>/clase de riesgo/i.test(h));
-    const cCaja=CH.findIndex(h=>/caja de compensaci/i.test(h));
-    const cFCes=CH.findIndex(h=>/fondo de cesant/i.test(h));
-
-    // ── Índice contratos por ID ───────────────────────────────────
-    const ctrMap={};
-    for(const r of ctr.rows){
-      const id=String(r[cID]||'').replace(/[^0-9]/g,'').trim();
-      if(id) ctrMap[id]=r;
+    // ── Leer empleados (opcional) ─────────────────────────────────
+    let empIds=new Set(), empNombres={};
+    const empFile = S.files && S.files['empleados'] ? S.files['empleados'] : null;
+    if(empFile){
+      const emp=await escReadEmpleados(empFile);
+      if(emp.valido){
+        empIds=emp.ids; empNombres=emp.nombres;
+        escLog(`   Empleados: ${empIds.size} cédulas cargadas — se agregará "Empleado;" a su propiedad`,'i','Lectura');
+      } else {
+        escLog('   Archivo empleados no válido: no contiene "Número de documento (Obligatorio)" en fila 2 — se ignora','w','Lectura');
+      }
     }
+
+    // ── Columnas maestro ─────────────────────────────────────────
+    const H=maestro.hdrs;
+    const cN  =H.find(h=>/nombre tercero/i.test(h))||'Nombre Tercero';
+    const cTI =H.find(h=>/tipo de identificaci/i.test(h))||'Tipo De Identificación';
+    const cID =H.find(h=>/^identificaci/i.test(h.trim()))||'Identificación';
+    const cReg=H.find(h=>/regimen/i.test(h))||'Tipo De Regimen Iva';
+    const cDir=H.find(h=>/^direcci/i.test(h.trim()))||'Dirección';
+    const cCiu=H.find(h=>/^ciudad$/i.test(h.trim()))||'Ciudad';
+    const cTel=H.find(h=>/^tel/i.test(h.trim()))||'Teléfono.';
+    const cEst=H.find(h=>/^estado$/i.test(h.trim()))||'Estado';
+    const cCliente=H.find(h=>/^cliente$/i.test(h.trim()))||'Cliente';
+    const cProv   =H.find(h=>/^proveedor$/i.test(h.trim()))||'Proveedor';
+    const cEmail  =H.find(h=>/correo electr/i.test(h))||null;
+    const cSuc    =H.find(h=>/^sucursal$/i.test(h.trim()))||null;
 
     // ── Consolidar ───────────────────────────────────────────────
-    empSetPStep(2); empSetPct(35,'Consolidando...');
-    await empEscSleep(30);
+    setPStep(2);setPct(30,'Consolidando...');
+    await escSleep(30);
 
-    const seen=new Set(), out=[];
-    const cargosSet=new Set(), centrosTrabSet=new Set(), centrosCostSet=new Set();
-    const camposPorDefecto=[];
-    const totalEntrada=emp.rows.length;
+    const seen=new Set(),out=[],defaults=[],nitExcluidos=[];
+    let totalEntrada=maestro.rows.length;
+    let errCount=0,warns=0;
 
-    for(const r of emp.rows){
-      const id=String(r[eID]||'').replace(/[^0-9]/g,'').trim();
-      if(!id){ EMP_ESC_EXCL.push({id:'',nombre:String(r[eN1]||''),motivo:'sin-id'}); continue; }
-      if(seen.has(id)){ EMP_ESC_EXCL.push({id,nombre:String(r[eN1]||''),motivo:'duplicado'}); continue; }
+    for(const r of maestro.rows){
+      const id=escNormId(r[H.indexOf(cID)]);
+      if(!id){ESC_EXCLUDED.push({id:'',nombre:String(r[H.indexOf(cN)]||''),tipo:'sin-id'});continue;}
+      if(seen.has(id)){ESC_EXCLUDED.push({id,nombre:String(r[H.indexOf(cN)]||''),tipo:'duplicado'});continue;}
       seen.add(id);
 
-      const c = ctrMap[id] || [];
-      const tipoId = empEscMap(r[eTI], EMP_ESC_TIPO_ID, 'CC');
-      const fechaIngreso = c[cFI] ? empEscFecha(c[cFI]) : '';
-      const fechaFin = c[cFF] ? empEscFecha(c[cFF]) : '';
+      // Si está en lista de exclusión → hoja aparte
+      if(ESC_NITS_EXCLUIR.has(id)){
+        nitExcluidos.push({id, nombre:String(r[H.indexOf(cN)]||'').toUpperCase().trim()});
+        continue;
+      }
+
+      // Si es empleado → no migrar, registrar en defaults como excluido
+      if(empIds.has(id)){
+        const empNom=empNombres[id]||nombre;
+        defaults.push({
+          'Tipo Identificación Aplicado':'CC',
+          'No. Identificación':id,
+          'Nombre':empNom,
+          'Concepto':'Tercero no se tiene en cuenta ya que es empleado'
+        });
+        continue;
+      }
+
+      const tipoIdRaw=String(r[H.indexOf(cTI)]||'');
+      const tipoId=escMapTipoId(tipoIdRaw, r[H.indexOf(cID)]);
+      const fueDefecto=(!tipoIdRaw||!tipoIdRaw.toString().trim()); // tipo estaba vacío
+      const _rawCiu=String(r[H.indexOf(cCiu)]||'').trim();
+      const _rawDir=String(r[H.indexOf(cDir)]||'').trim();
+      const _rawTel=String(r[H.indexOf(cTel)]||'').trim();
+      const esNIT=escIsNIT(tipoIdRaw);
+      const nombre=String(r[H.indexOf(cN)]||'').trim();
+      const regimen=String(r[H.indexOf(cReg)]||'');
+      const ciudad=escNormCiudad(_rawCiu);
+      const dir=escNormAddr(_rawDir);
+      const tel=escNormTel(_rawTel);
+      // Track field defaults
+      if(!_rawCiu||_rawCiu==='nan') defaults.push({'Tipo Identificación Aplicado':tipoId,'No. Identificación':id,'Nombre':nombre,'Concepto':'Ciudad vacía en origen — se aplica Bogota D.C. por defecto'});
+      if(!_rawDir||_rawDir.length<3) defaults.push({'Tipo Identificación Aplicado':tipoId,'No. Identificación':id,'Nombre':nombre,'Concepto':'Dirección vacía en origen — se aplica DIRECCION NO INFORMADA por defecto'});
+      if(!_rawTel||_rawTel==='-') defaults.push({'Tipo Identificación Aplicado':tipoId,'No. Identificación':id,'Nombre':nombre,'Concepto':'Teléfono vacío en origen — se aplica 6050000000 por defecto'});
+      const activo=escMapActivo(r[H.indexOf(cEst)]);
+      const retencion=escMapRegimen(regimen,tipoIdRaw,r[H.indexOf(cID)]);
+
+      // Propiedad activa — siempre termina en ;
+      let propActiva='Cliente;Proveedor;';
+      if(cCliente&&cProv){
+        const esC=String(r[H.indexOf(cCliente)]||'').trim().toLowerCase().startsWith('s');
+        const esP=String(r[H.indexOf(cProv)]||'').trim().toLowerCase().startsWith('s');
+        if(esC&&esP)propActiva='Cliente;Proveedor;';
+        else if(esC)propActiva='Cliente;';
+        else if(esP)propActiva='Proveedor;';
+        else propActiva='Cliente;Proveedor;';
+      }
+      // Si el archivo de empleados fue cargado y este ID está en él → agregar Empleado;
+      if(empIds.size>0 && empIds.has(id)){
+        propActiva = propActiva + 'Empleado;';
+      }
+
+      // Email
+      let email=cEmail?String(r[H.indexOf(cEmail)]||'').trim():'';
+      if(!email)email=emailMapC[id]||emailMapP[id]||'';
+
+      // Nombre split
+      // NIT empresa (inicia 8 o 9, 9 dígitos): nombre completo en p1
+      // NIT persona (otros): separar nombre como CC
+      // CC/otros: separar normalmente
+      let p1='',p2='',a1='',a2='';
+      const tipoIdRawLow = tipoIdRaw.toLowerCase().trim();
+      const isNitRaw = tipoIdRawLow.includes('nit') || tipoIdRawLow==='';
+      if(isNitRaw && escNitEsEmpresa(r[H.indexOf(cID)])){
+        // NIT empresa → nombre completo en primer campo (mayúsculas)
+        p1=String(nombre).toUpperCase();
+      } else {
+        // NIT persona o CC → separar nombre
+        const sn=tercSplitName(nombre,tipoId);p1=sn.p1;p2=sn.p2;a1=sn.a1;a2=sn.a2;
+      }
+
+      // Sucursal
+      const suc=cSuc?String(r[H.indexOf(cSuc)]||'').trim():'';
 
       const row={
-        'Tipo Identificación': tipoId,
-        'Identificación': id,
-        'Identificación Ciudad': empEscNormCiudad(r[eCiu]),
-        'Primer Nombre': String(r[eN1]||'').toUpperCase().trim(),
-        'Segundo Nombre': String(r[eN2]||'').toUpperCase().trim()||null,
-        'Primer Apellido': String(r[eA1]||'').toUpperCase().trim(),
-        'Segundo Apellido': String(r[eA2]||'').toUpperCase().trim()||null,
-        'Tipo Contrato': c[cTC] ? empEscMap(c[cTC], EMP_ESC_CONTRATO, 'Indefinido') : null,
-        'Fecha Ingreso': fechaIngreso||null,
-        'Area': c[cGN] ? empEscMap(c[cGN], EMP_ESC_AREA, 'Administrativa') : null,
-        'Clase': 'Normal',
-        'Empresa': null,
-        'Cargo': c[cCarg] ? String(c[cCarg]).trim() : null,
-        'Sueldo': c[cSuel] ? String(c[cSuel]).replace(/[^0-9]/g,'') : null,
-        'Periodo Pago': 'Mensual',
-        'Centro Costos': c[cCC] ? String(c[cCC]).split('-').pop().trim() : null,
-        'Clasificación Dian': 'Normal',
-        'Cesantias': -1, 'IntCesantias': -1, 'Prima ': -1, 'Vacaciones': -1, 'Ret. Fte': -1,
-        'Fecha Nacimiento': null,
-        'Ciudad': empEscNormCiudad(r[eCiu]),
-        'Tipo Dirección': 'Casa',
-        'Direccion': String(r[eDir]||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim()||null,
-        'Teléfono': String(r[eTel]||'').replace(/[^0-9]/g,'')||null,
-        'E_Mail': String(r[eEm]||'').trim().toLowerCase()||null,
-        'Número hijos': null,
-        'Estado Civil': null,
-        'Declarante': null,
-        'Dotación': null,
-        'Tipo Cuenta ': r[eTCta] ? empEscMap(r[eTCta], EMP_ESC_TIPO_CUENTA) : null,
-        'Número Cuenta ': r[eNCta] ? String(r[eNCta]).replace(/\.0$/,'').trim() : null,
-        'Banco Cuenta': r[eBanco] ? empEscMap(r[eBanco], EMP_ESC_BANCO) : null,
-        'Tipo Sena': null,
-        'Fecha Fin Periodo Prueba': null,
-        'Fecha Fin Contrato': fechaFin||null,
-        // Store originals for modal mapping
-        '_orig_ARL':  c[cARL]  ? String(c[cARL]).trim()  : '',
-        '_orig_EPS':  c[cEPS]  ? String(c[cEPS]).trim()  : '',
-        '_orig_Pen':  c[cPen]  ? String(c[cPen]).trim()  : '',
-        '_orig_FCes': c[cFCes] ? String(c[cFCes]).trim() : '',
-        '_orig_Caja': c[cCaja] ? String(c[cCaja]).trim() : '',
-        'ARL': c[cARL] ? empEscMap(c[cARL], EMP_ESC_ARL) : null,
-        'Fecha Afil. ARL': fechaIngreso||null,
-        'Tarifa ARL': c[cRiesgo] ? (String(c[cRiesgo]).match(/(\d+[,.]\d+)/)||[''])[0].replace('.',',') : null,
-        'EPS': c[cEPS] ? empEscMap(c[cEPS], EMP_ESC_EPS) : null,
-        'Fecha Afil. EPS': fechaIngreso||null,
-        'Pensión': c[cPen] ? empEscMap(c[cPen], EMP_ESC_PENSION) : null,
-        'Fecha Afil. AFP': fechaIngreso||null,
-        'Fondo Cesantias': c[cFCes] ? empEscMap(c[cFCes], EMP_ESC_PENSION) : null,
-        'Fecha Afil. Fondo Cesantías': fechaIngreso||null,
-        'Caja de Compensacion': c[cCaja] ? empEscMap(c[cCaja], EMP_ESC_CAJA) : null,
-        'Fecha Afil. Caja': fechaIngreso||null,
-        'Código Centro Costos': null,
-        'Libreta Militar No.': null,
-        'Sexo': null,
-        'Centro De Trabajo': r[eDirOf] ? String(r[eDirOf]).trim() : null,
-        'Tipo Cotizante': c[cTCot] ? empEscMap(c[cTCot], EMP_ESC_TIPO_COT, 'Dependiente') : 'Dependiente',
-        'Sub tipo Cotizante': c[cSTCot] ? empEscMap(c[cSTCot], EMP_ESC_SUB_COT, 'Ninguno') : 'Ninguno'
+        'Tipo Identificación':tipoId,
+        'No. Identificación':id,
+        'Ciudad Identificación':ciudad,
+        '1er. Nombre o Razón Social':p1,
+        '2do. Nombre':p2||null,
+        '1re. Apellido':a1||null,
+        '2do.Apellido':a2||null,
+        'Propiedad Activa':propActiva,
+        'Activo':activo,
+        'Propiedad Retención':retencion,
+        'Fecha Creación':escFechaHoy(),
+        'Plazo':0,
+        'Clasificación Dian':'Normal',
+        'Actividad Económica':null,
+        'Matricula':null,
+        'Tipos_Responsabilidades':null,
+        'Aplica ReteIca':null,
+        '% Ica':null,
+        'Maneja Cupo Crédito':null,
+        'Cupo Crédito':null,
+        'Código':null,
+        'Fecha Aniversario':null,
+        'Forma de Pago':null,
+        'Lista Precios':null,
+        'Nota':null,
+        '% Descuento':null,
+        'Vendedor':null,
+        'Clasificación Uno':null,'Clasificación Dos':null,'Clasificación Tres':null,
+        'Zona Uno':null,'Zona Dos':null,
+        'Personalizado 1':null,'Personalizado 2':null,'Personalizado 3':null,
+        'Personalizado 4':null,'Personalizado 5':null,'Personalizado 6':null,
+        'Personalizado 7':null,'Personalizado 8':null,'Personalizado 9':null,
+        'Personalizado 10':null,'Personalizado 11':null,'Personalizado 12':null,
+        'Personalizado 13':null,'Personalizado 14':null,'Personalizado 15':null,
+        'Tipo Dirección':(tipoId==='NIT'&&escNitEsEmpresa(r[H.indexOf(cID)]))?'Empresa/Oficina':'Casa',
+        'Ciudad Dirección':ciudad,
+        'Dirección':dir,
+        'Dirección Principal':-1,
+        'Teléfonos':tel||null,
+        'Código Postal':null,
+        'Fax':null,
+        'Movil 1':null,
+        'Movil 2':null,
+        'E_Mail':email||null,
+        'E_Mail 2':null,
+        'E_Mail 3':null,
+        'Página Web':null,
+        'Observaciones':null,
+        'Sucursal':suc||null
       };
       out.push(row);
-
-      // Track unique cargos, centros de trabajo, centros de costo
-      if(row['Cargo']) cargosSet.add(String(row['Cargo']).trim());
-      if(row['Centro De Trabajo']) centrosTrabSet.add(String(row['Centro De Trabajo']).trim());
-      if(row['Centro Costos']) centrosCostSet.add(String(row['Centro Costos']).trim());
-
-      // Track campos por defecto
-      if(!c[cFI]) camposPorDefecto.push({id:row['Identificación'],nombre:`${row['Primer Nombre']||''} ${row['Primer Apellido']||''}`.trim(),campo:'Fechas (Ingreso/Afiliaciones)',valor:'Fecha vacía — no se asigna',motivo:'Contrato sin fecha de inicio'});
-      if(!c[cTC]) camposPorDefecto.push({id:row['Identificación'],nombre:`${row['Primer Nombre']||''} ${row['Primer Apellido']||''}`.trim(),campo:'Tipo Contrato',valor:'Indefinido',motivo:'Campo vacío en contratos'});
-      if(!c[cGN]) camposPorDefecto.push({id:row['Identificación'],nombre:`${row['Primer Nombre']||''} ${row['Primer Apellido']||''}`.trim(),campo:'Area',valor:'Administrativa',motivo:'Grupo nómina vacío'});
-      if(row['Clase']==='Normal') camposPorDefecto.push({id:row['Identificación'],nombre:`${row['Primer Nombre']||''} ${row['Primer Apellido']||''}`.trim(),campo:'Clase',valor:'Normal',motivo:'Valor fijo por defecto'});
-      if(row['Periodo Pago']==='Mensual') camposPorDefecto.push({id:row['Identificación'],nombre:`${row['Primer Nombre']||''} ${row['Primer Apellido']||''}`.trim(),campo:'Periodo Pago',valor:'Mensual',motivo:'Valor fijo por defecto'});
-      if(row['Clasificación Dian']==='Normal') camposPorDefecto.push({id:row['Identificación'],nombre:`${row['Primer Nombre']||''} ${row['Primer Apellido']||''}`.trim(),campo:'Clasificación Dian',valor:'Normal',motivo:'Valor fijo por defecto'});
-      if(!row['Teléfono']||row['Teléfono']==='') camposPorDefecto.push({id:row['Identificación'],nombre:`${row['Primer Nombre']||''} ${row['Primer Apellido']||''}`.trim(),campo:'Teléfono',valor:row['Teléfono']||'vacío',motivo:'Teléfono vacío en origen'});
+      if(fueDefecto){
+        defaults.push({
+          'Tipo Identificación Aplicado': tipoId,
+          'No. Identificación': id,
+          'Nombre': nombre,
+          'Concepto': 'Dato de origen en blanco — se anexa CC por defecto'
+        });
+      }
     }
 
-    empLog(`✅ Consolidados: ${out.length} registros`,'o','Consolidación');
-    const sinContrato = [...seen].filter(id=>!ctrMap[id]).length;
-    if(sinContrato>0) empLog(`   ⚠ ${sinContrato} empleados sin contrato (campos de contrato vacíos)`,'w','Consolidación');
+    escLog(`✅ Consolidados: ${out.length} registros`,'o','Consolidación');
 
     // ── Transformación ───────────────────────────────────────────
-    empSetPStep(3); empSetPct(65,'Transformando...');
-    await empEscSleep(30);
-    empLog(`🔄 Transformados: ${out.length} registros`,'o','Transformación');
+    setPStep(3);setPct(60,'Transformando...');
+    await escSleep(30);
+    escLog(`🔄 Transformados: ${out.length} registros`,'o','Transformación');
 
-    // ── Generación Excel ─────────────────────────────────────────
-    empSetPStep(4); empSetPct(85,'Generando Excel...');
-    await empEscSleep(30);
-    empLog('📊 Construyendo archivo Excel...','i','Escritura');
+    // ── Construcción Excel ────────────────────────────────────────
+    setPStep(4);setPct(80,'Generando Excel...');
+    await escSleep(30);
+    escLog('📊 Construyendo archivo Excel...','i','Escritura');
+
+    if(nitExcluidos.length>0) escLog(`   ${nitExcluidos.length} NITs excluidos (lista predefinida)`,'w','Consolidación');
+    ESC_WB = escBuildWB(out, ESC_LOG, {
+      archivos_entrada:1,
+      registros_entrada:totalEntrada,
+      registros_salida:out.length,
+      errores:errCount,
+      warnings:warns
+    }, ESC_EXCLUDED, defaults, nitExcluidos);
 
     const dur=((Date.now()-t0)/1000).toFixed(1);
-    empSetPct(95,'Preparando mapeo...'); empSetPStep(4);
-    empLog('🔗 Abriendo ventana de mapeo de entidades...','i','Mapeo');
+    setPct(100,'¡Listo!');
+    setPStep(5);
+    escLog(`✅ Excel generado en ${dur}s — ${out.length} registros`,'o','Escritura');
 
-    // Store pending data and show mapping modal
-    _empEscPending = {out, stats:{registros_entrada:totalEntrada,registros_salida:out.length},
-      excluded:EMP_ESC_EXCL, cargos:cargosSet, centrosTrab:centrosTrabSet,
-      centrosCost:centrosCostSet, defaults:camposPorDefecto, dur, totalEntrada};
-    empShowMapModal(out);
-    return; // Will continue in empMapConfirm()
+    // Mostrar resultado
+    const fn=escBuildFN();
+    const fnEl=document.getElementById('dl-fn');
+    if(fnEl)fnEl.textContent=fn;
+    const stIn=document.getElementById('st-in');
+    const stOk=document.getElementById('st-ok');
+    if(stIn)stIn.textContent=totalEntrada;
+    if(stOk)stOk.textContent=out.length;
 
-    // (code below runs after modal - see empMapConfirm)
-    empSetPct(100,'¡Listo!'); empSetPStep(5);
-    empLog(`✅ Excel generado en ${dur}s — ${out.length} registros`,'o','Escritura');
-
-    const fn=empEscBuildFN();
-    const fnEl=document.getElementById('emp-dl-fn');
-    if(fnEl) fnEl.textContent=fn;
-    const stIn=document.getElementById('emp-st-in');
-    const stOk=document.getElementById('emp-st-ok');
-    if(stIn) stIn.textContent=totalEntrada;
-    if(stOk) stOk.textContent=out.length;
-
+    // Log backend
     try{
       await api('POST','/migrations',{
         filename_out:fn,orig_soft:'Siigo Nube',dest_soft:'World Office Escritorio',
-        module:'Empleados',records_in:totalEntrada,records_out:out.length,
-        errors:0,warnings:sinContrato,duration_sec:parseFloat(dur),status:'completed'
+        module:'Terceros',records_in:totalEntrada,records_out:out.length,
+        errors:errCount,warnings:warns,duration_sec:parseFloat(dur),status:'completed'
       },AUTH.token);
     }catch(e){}
 
-    empSetStep(4);
+    setStep(4);
+
   }catch(err){
-    empLog(`❌ Error: ${err.message}`,'e','Pipeline');
+    escLog(`❌ Error: ${err.message}`,'e','Pipeline');
     console.error(err);
   }
 }
 
-function empEscBuildFN(){
-  const d=new Date();
-  return `empleados_siigo_nube_wo_escritorio_${d.getFullYear()}_${String(d.getMonth()+1).padStart(2,'0')}_${String(d.getDate()).padStart(2,'0')}.xlsx`;
+// ── Build Filename ────────────────────────────────────────────────
+function escBuildFN(){
+  const now=new Date();
+  const ts=now.getFullYear()+'_'+String(now.getMonth()+1).padStart(2,'0')+'_'+String(now.getDate()).padStart(2,'0');
+  return `terceros_siigo_nube_wo_escritorio_${ts}.xlsx`;
 }
 
-function empEscBuildWB(rows, logEntries, stats, excluded, cargosSet, centrosTrabSet, centrosCostSet, camposPorDefecto){
+// ── Build Workbook ────────────────────────────────────────────────
+function escBuildWB(rows, logEntries, stats, excluded, defaults, nitExcluidos){
   const wb=XLSX.utils.book_new();
 
-  // Hoja 1: Información Empleados
-  const DATE_COLS=new Set(['Fecha Ingreso','Fecha Nacimiento','Fecha Fin Periodo Prueba',
-    'Fecha Fin Contrato','Fecha Afil. ARL','Fecha Afil. EPS','Fecha Afil. AFP',
-    'Fecha Afil. Fondo Cesantías','Fecha Afil. Caja']);
-  const aoa=[EMP_ESC_COLS.slice()];
-  rows.forEach(r=>aoa.push(EMP_ESC_COLS.map(c=>{const v=r[c];return v===undefined||v===''?null:v??null;})));
-  const ws1=XLSX.utils.aoa_to_sheet(aoa);
-  // Force date columns to string so Excel shows dd/MM/yyyy not a number
-  const rng=XLSX.utils.decode_range(ws1['!ref']||'A1');
-  EMP_ESC_COLS.forEach((col,ci)=>{
-    if(!DATE_COLS.has(col))return;
-    for(let ri=1;ri<=rng.e.r;ri++){
-      const addr=XLSX.utils.encode_cell({r:ri,c:ci});
-      if(ws1[addr]&&ws1[addr].v!==null&&ws1[addr].v!==undefined){
-        ws1[addr].t='s';
-        ws1[addr].v=String(ws1[addr].v);
-        delete ws1[addr].z;
-      }
-    }
+  // Hoja 1: migrar clientes proveedores
+  const aoa=[ESC_COLS.slice()];
+  rows.forEach(r=>{
+    aoa.push(ESC_COLS.map(c=>{const v=r[c];return(v===''||v===undefined)?null:v??null;}));
   });
-  XLSX.utils.book_append_sheet(wb,ws1,'Información Empleados');
+  const ws1=XLSX.utils.aoa_to_sheet(aoa);
+  XLSX.utils.book_append_sheet(wb,ws1,'migrar clientes proveedores');
 
-  // Hoja 2: Logs
+  // Hoja 2: sucursales Clientes
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Identificación','Sucursal','']]),'sucursales Clientes');
+
+  // Hoja 3: Logs
+  const tsNow=new Date().toISOString();
   const logsAoa=[['timestamp','fase','nivel','mensaje']];
-  (logEntries||[]).forEach(e=>logsAoa.push([e.ts,e.fase,e.lvl==='e'?'ERROR':e.lvl==='w'?'WARN':'INFO',e.msg]));
+  (logEntries||[]).forEach(e=>logsAoa.push([e.ts||tsNow,e.fase||'',e.lvl==='e'?'ERROR':e.lvl==='w'?'WARN':'INFO',e.msg||'']));
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(logsAoa),'Logs');
 
-  // Hoja 3: Estadísticas
+  // Hoja 4: Estadísticas
   const s=stats||{};
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([
-    ['Métrica','Valor'],
-    ['Registros entrada',s.registros_entrada||0],
-    ['Registros salida',rows.length],
-  ]),'Estadísticas');
+  const estAoa=[['Métrica','Valor'],
+    ['archivos_entrada',s.archivos_entrada||1],
+    ['registros_entrada',s.registros_entrada||0],
+    ['registros_salida',rows.length],
+    ['errores_validacion',s.errores||0],
+    ['warnings_validacion',s.warnings||0]];
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(estAoa),'Estadísticas');
 
-  // Hoja 4: Excluidos
-  const exAoa=[['Identificación','Nombre','Motivo']];
-  (excluded||[]).forEach(e=>exAoa.push([e.id,e.nombre,e.motivo]));
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(exAoa),'Excluidos');
+  // Hoja 5: IdentificacionesExcluidas
+  const exclAoa=[['Identificación','Nombre o Razón Social','Motivo']];
+  (excluded||[]).forEach(e=>exclAoa.push([e.id,e.nombre,e.tipo]));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(exclAoa),'IdentificacionesExcluidas');
 
-  // Hoja: Cargos
-  if(cargosSet && cargosSet.size > 0){
-    const cargosAoa=[['Cargo']];
-    [...cargosSet].sort().forEach(c=>cargosAoa.push([c]));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(cargosAoa), 'Cargos');
+  // Hoja 6: Terceros no tenidos en cuenta (NITs excluidos)
+  if(nitExcluidos&&nitExcluidos.length>0){
+    const nitAoa=[['Identificación','Nombre o Razón Social','Motivo']];
+    nitExcluidos.forEach(d=>nitAoa.push([d.id, d.nombre, 'Tercero ya existe en la base de datos — excluido de la migración']));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(nitAoa),'Terceros no tenidos en cuenta');
   }
 
-  // Hoja: Centro de Trabajo
-  if(centrosTrabSet && centrosTrabSet.size > 0){
-    const ctAoa=[['Centro de Trabajo']];
-    [...centrosTrabSet].sort().forEach(c=>ctAoa.push([c]));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ctAoa), 'Centro de Trabajo');
+  // Hoja 7: Campos aplicados por defecto
+  if(defaults&&defaults.length>0){
+    const defAoa=[['Tipo Identificación Aplicado','No. Identificación','Nombre','Concepto']];
+    defaults.forEach(d=>defAoa.push([d['Tipo Identificación Aplicado'],d['No. Identificación'],d['Nombre'],d['Concepto']]));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(defAoa),'Campos aplicados por defecto');
   }
-
-  // Hoja: Centro de Costos
-  if(centrosCostSet && centrosCostSet.size > 0){
-    const ccAoa=[['Centro de Costos']];
-    [...centrosCostSet].sort().forEach(c=>ccAoa.push([c]));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ccAoa), 'Centro de Costos');
-  }
-
-  // Hoja: Campos por Defecto
-  const defAoa=[['Identificación','Nombre','Campo','Valor Asignado','Motivo']];
-  if(camposPorDefecto && camposPorDefecto.length > 0){
-    camposPorDefecto.forEach(d=>defAoa.push([d.id, d.nombre, d.campo, d.valor, d.motivo]));
-  }
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(defAoa), 'Campos por Defecto');
 
   return wb;
 }
 
-
-// ── Mapping Modal ─────────────────────────────────────────────────
-const EMP_MAP_COLS = {
-  'ARL':             {label:'ARL / Administradora de Riesgos Laborales', rowKey:'ARL'},
-  'EPS':             {label:'EPS / Fondo de Salud',                       rowKey:'EPS'},
-  'Pensión':         {label:'Fondo de Pensión',                           rowKey:'Pensión'},
-  'Fondo Cesantias': {label:'Fondo de Cesantías',                         rowKey:'Fondo Cesantias'},
-  'Caja de Compensacion': {label:'Caja de Compensación',                  rowKey:'Caja de Compensacion'},
-};
-
-function empShowMapModal(rows){
-  // Collect unique values per entity column
-  // Use ORIGINAL values from Siigo (before mapping) for the modal
-  const origKeys = {'ARL':'_orig_ARL','EPS':'_orig_EPS',
-    'Pensión':'_orig_Pen','Fondo Cesantias':'_orig_FCes','Caja de Compensacion':'_orig_Caja'};
-  const entities = {};
-  Object.keys(EMP_MAP_COLS).forEach(col=>{
-    const origKey = origKeys[col] || col;
-    const vals = new Set();
-    rows.forEach(r=>{ const v=r[origKey]; if(v) vals.add(String(v).trim()); });
-    if(vals.size>0) entities[col] = [...vals].sort();
-  });
-
-  // Build modal sections
-  const container = document.getElementById('emp-map-sections');
-  if(!container){ console.error('emp-map-sections not found'); return; }
-  container.innerHTML='';
-  
-  Object.entries(entities).forEach(([col, vals])=>{
-    const cfg = EMP_MAP_COLS[col];
-    const section = document.createElement('div');
-    section.style.cssText='background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:20px;margin-bottom:20px';
-    section.innerHTML = `
-      <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:14px;display:flex;align-items:center;gap:8px">
-        <span style="background:rgba(255,255,255,.15);padding:3px 10px;border-radius:20px;font-size:11px;font-family:monospace">${col}</span>
-        <span>${cfg.label}</span>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;color:rgba(255,255,255,.5);margin-bottom:8px;padding:0 4px">
-        <div>Valor en Siigo Nube (origen)</div><div>Nombre en World Office Escritorio</div>
-      </div>
-      ${vals.map(v=>`
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-          <div style="background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.1);border-radius:8px;
-            padding:10px 14px;color:rgba(255,255,255,.8);font-size:13px;display:flex;align-items:center">${v}</div>
-          <input type="text" placeholder="Nombre exacto en WO Escritorio..."
-            data-col="${col}" data-val="${v.replace(/"/g,'&quot;')}"
-            style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);border-radius:8px;
-              padding:10px 14px;color:#fff;font-size:13px;outline:none;width:100%;box-sizing:border-box"
-            oninput="this.style.borderColor=this.value?'rgba(74,222,128,.6)':'rgba(255,255,255,.2)'">
-        </div>`).join('')}
-    `;
-    container.appendChild(section);
-  });
-
-  // Show modal
-  const modal = document.getElementById('emp-map-modal');
-  if(modal){ modal.style.display='block'; modal.scrollTop=0; }
-  setTimeout(()=>{
-    const btn = document.getElementById('emp-map-confirm-btn');
-    if(btn) btn.addEventListener('click', empMapConfirm);
-  },50);
-}
-
-function empMapConfirm(){
-  const modal = document.getElementById('emp-map-modal');
-  const errEl = document.getElementById('emp-map-err');
-  const inputs = modal ? modal.querySelectorAll('input[data-col]') : [];
-
-  // Empty fields = keep the auto-mapped value (not blocking)
-  if(errEl) errEl.style.display='none';
-
-  // Build mapping
-  const mapping = {}; // { col: { siigo_val: wo_val } }
-  inputs.forEach(inp=>{
-    const col = inp.dataset.col;
-    const val = inp.dataset.val;
-    if(!mapping[col]) mapping[col] = {};
-    mapping[col][val] = inp.value.trim();
-  });
-
-  // Apply mapping to pending rows
-  if(!_empEscPending){ if(modal) modal.style.display='none'; return; }
-  const {out, stats, excluded, cargos, centrosTrab, centrosCost, defaults, dur, totalEntrada} = _empEscPending;
-
-  // Apply mapping using original values as lookup key
-  const origKeys2 = {'ARL':'_orig_ARL','EPS':'_orig_EPS',
-    'Pensión':'_orig_Pen','Fondo Cesantias':'_orig_FCes','Caja de Compensacion':'_orig_Caja'};
-  out.forEach(row=>{
-    Object.keys(EMP_MAP_COLS).forEach(col=>{
-      const key = EMP_MAP_COLS[col].rowKey;
-      const origKey = origKeys2[col] || col;
-      const origVal = row[origKey] || '';
-      if(origVal && mapping[col] && mapping[col][origVal]){
-        row[key] = mapping[col][origVal];
-      }
-    });
-  });
-
-  // Build workbook
-  EMP_ESC_WB = empEscBuildWB(out, EMP_ESC_LOG, stats, excluded, cargos, centrosTrab, centrosCost, defaults);
-
-  // Close modal
-  if(modal) modal.style.display='none';
-
-  // Finish ETL
-  empSetPct(100,'¡Listo!'); empSetPStep(5);
-  empLog('✅ Excel generado en '+dur+'s — '+out.length+' registros','o','Escritura');
-
-  const fn = empEscBuildFN();
-  const fnEl = document.getElementById('emp-dl-fn'); if(fnEl) fnEl.textContent=fn;
-  const stIn = document.getElementById('emp-st-in'); if(stIn) stIn.textContent=totalEntrada;
-  const stOk = document.getElementById('emp-st-ok'); if(stOk) stOk.textContent=out.length;
-
-  try{
-    api('POST','/migrations',{
-      filename_out:fn,orig_soft:'Siigo Nube',dest_soft:'World Office Escritorio',
-      module:'Empleados',records_in:totalEntrada,records_out:out.length,
-      errors:0,warnings:0,duration_sec:parseFloat(dur),status:'completed'
-    },AUTH.token);
-  }catch(e){}
-
-  empSetStep(4);
-  _empEscPending = null;
-}
-
-function empEscDoDownload(){
-  if(!EMP_ESC_WB){alert('Primero ejecuta el proceso ETL');return;}
-  XLSX.writeFile(EMP_ESC_WB, empEscBuildFN());
+// ── Descarga ──────────────────────────────────────────────────────
+function escDoDownload(){
+  if(!ESC_WB){alert('Primero ejecuta el proceso ETL');return;}
+  const fn=escBuildFN();
+  XLSX.writeFile(ESC_WB,fn);
 }
