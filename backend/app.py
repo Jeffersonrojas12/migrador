@@ -425,7 +425,7 @@ def init_db():
             ('jehr0309@gmail.com','123jehr0309@g','Johan Esteban Hernández Reyes','JO','','user'),
             ('leijorca@hotmail.com','123leijorca@h','Leidy Johana Ortiz Castro','JO','','user'),
             ('jesuspastrana312@gmail.com','123jesuspastr','Jesus Pastrana','JO','','user'),
-            ('fernando,7148@outlook.com','123fernando,7','Fernando Molina','JO','','user'),
+            ('fernando.7148@outlook.com','123fernando,7','Fernando Molina','JO','','user'),
             ('contadortiz@gmail.com','123contadorti','Nelson Armando Ortiz','JO','','user'),
             ('karen.duartem19@gmail.com','123karen.duar','Karen Samantha Duarte','JO','','user'),
             ('lorenabernalpartnerwo@gmail.com','123lorenabern','Yensi Lorena Bernal socha','JO','','user'),
