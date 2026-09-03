@@ -486,8 +486,8 @@ function invCldShowPriceModal(hdrs){
       <div style="font-size:13px;font-weight:600;color:#fff;margin-bottom:8px">${label}</div>
       <select id="${id}" style="width:100%;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);
         border-radius:8px;padding:10px 14px;color:#fff;font-size:13px;outline:none">
-        <option value="">— No asignar —</option>
-        ${priceOpts.map(h=>`<option value="${h}">${h}</option>`).join('')}
+        <option value="" style="background:#1a1060;color:#fff">— No asignar —</option>
+        ${priceOpts.map(h=>`<option value="${h}" style="background:#1a1060;color:#fff">${h}</option>`).join('')}
       </select>
       <div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:5px">
         El nombre de la lista será el título de la columna seleccionada
